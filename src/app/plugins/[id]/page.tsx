@@ -1,14 +1,24 @@
 import React from 'react';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { Sparkles, Check, ArrowLeft, Download, ShieldCheck, Cpu, Layers } from 'lucide-react';
+import { Sparkles, Check, ArrowLeft, Download, ShieldCheck, Cpu, Layers, CheckCircle2, Zap, MonitorCheck } from 'lucide-react';
 import { PLUGINS_DATA, getPluginImageUrl } from '../../../data/plugins';
+import { PluginMiniPlayer } from '../../../components/PluginMiniPlayer';
 
 export function generateStaticParams() {
   return PLUGINS_DATA.map((plugin) => ({
     id: plugin.id,
   }));
 }
+
+const COMPATIBLE_DAWS = [
+  { name: 'FL Studio', version: '20, 21, 2026+', format: 'Native VST3' },
+  { name: 'Ableton Live', version: '10, 11, 12+', format: 'VST3 / AU' },
+  { name: 'Apple Logic Pro', version: '10.7, 11+', format: 'AU (Silicon M1-M4)' },
+  { name: 'Avid Pro Tools', version: '2023, 2024+', format: 'VST3 Bridge / PatchWork' },
+  { name: 'PreSonus Studio One', version: '5, 6+', format: 'Native VST3' },
+  { name: 'Cockos REAPER', version: '6, 7+', format: 'Native VST3' },
+];
 
 export default function PluginDetailPage({ params }: { params: { id: string } }) {
   const plugin = PLUGINS_DATA.find((p) => p.id === params.id);
@@ -70,11 +80,11 @@ export default function PluginDetailPage({ params }: { params: { id: string } })
                 </span>
               </div>
               <span className="text-xs text-slate-400 block mt-1">
-                One-time purchase • Lifetime updates • 3 machine activations
+                One-time purchase • Lifetime updates • 3 machine authorizations
               </span>
             </div>
 
-            <div className="flex items-center space-x-3 w-full sm:w-auto">
+            <div className="flex flex-col sm:flex-row items-center gap-3 w-full sm:w-auto">
               <Link
                 href="/pricing"
                 className="w-full sm:w-auto px-6 py-3.5 rounded-xl bg-gradient-to-r from-cyber-cyan to-blue-600 text-black text-xs font-black shadow-glow-cyan hover:brightness-110 active:scale-95 transition-all flex items-center justify-center space-x-2"
@@ -110,6 +120,9 @@ export default function PluginDetailPage({ params }: { params: { id: string } })
         </div>
       </div>
 
+      {/* Live Audio Audition Mini-Player (If Demo Exists) */}
+      <PluginMiniPlayer pluginId={plugin.id} />
+
       {/* Feature Breakdown & Specifications */}
       <div className="mt-12 grid grid-cols-1 md:grid-cols-2 gap-8">
         {/* Core Features */}
@@ -141,7 +154,7 @@ export default function PluginDetailPage({ params }: { params: { id: string } })
             </div>
             <div className="flex justify-between py-2">
               <span className="text-slate-400">macOS Support:</span>
-              <span className="font-mono text-white font-bold">macOS 11+ (M1/M2/M3 & Intel)</span>
+              <span className="font-mono text-white font-bold">macOS 11+ (Apple Silicon & Intel)</span>
             </div>
             <div className="flex justify-between py-2">
               <span className="text-slate-400">Windows Support:</span>
@@ -157,6 +170,60 @@ export default function PluginDetailPage({ params }: { params: { id: string } })
             </div>
           </div>
         </div>
+      </div>
+
+      {/* Verified DAW Compatibility Grid */}
+      <div className="mt-12 rounded-3xl bg-studio-900/60 border border-white/10 p-8">
+        <div className="flex items-center space-x-3 mb-6">
+          <MonitorCheck className="w-6 h-6 text-emerald-400" />
+          <div>
+            <h3 className="text-lg font-black text-white">Verified DAW Compatibility</h3>
+            <p className="text-xs text-slate-400">Strictly tested and verified against plugin scanner crashes and AU validation tests.</p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+          {COMPATIBLE_DAWS.map((daw, idx) => (
+            <div
+              key={idx}
+              className="p-3.5 rounded-2xl bg-studio-950 border border-white/5 flex flex-col justify-between"
+            >
+              <div>
+                <div className="flex items-center space-x-1.5 text-xs font-black text-white">
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                  <span>{daw.name}</span>
+                </div>
+                <span className="text-[11px] text-slate-400 block mt-1">{daw.version}</span>
+              </div>
+              <span className="text-[10px] font-mono text-cyber-cyan bg-cyber-cyan/10 px-2 py-0.5 rounded mt-3 text-center">
+                {daw.format}
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Slate Digital / Waves Style Trust & Guarantee Box */}
+      <div className="mt-8 rounded-3xl bg-gradient-to-r from-studio-950 via-studio-900 to-studio-950 border border-white/10 p-8 flex flex-col md:flex-row items-center justify-between gap-6">
+        <div className="flex items-center space-x-4">
+          <div className="w-12 h-12 rounded-2xl bg-cyber-cyan/10 border border-cyber-cyan/30 flex items-center justify-center shrink-0">
+            <ShieldCheck className="w-6 h-6 text-cyber-cyan" />
+          </div>
+          <div>
+            <h4 className="text-base font-black text-white">30-Day Money-Back Guarantee & Zero Dongles</h4>
+            <p className="text-xs text-slate-400 mt-0.5">
+              If {plugin.shortName} doesn&apos;t instantly improve your production workflow, reach out within 30 days for a 100% refund. No iLok USB hardware dongle required.
+            </p>
+          </div>
+        </div>
+
+        <Link
+          href="/download"
+          className="w-full md:w-auto px-6 py-3 rounded-xl bg-white/10 hover:bg-white/15 text-white text-xs font-bold transition-all whitespace-nowrap flex items-center justify-center space-x-2 border border-white/10"
+        >
+          <Download className="w-4 h-4 text-cyber-cyan" />
+          <span>Install with Central</span>
+        </Link>
       </div>
     </div>
   );

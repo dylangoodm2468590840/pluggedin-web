@@ -2,8 +2,40 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
-import { Sparkles, Check, Flame, Shield, ArrowRight, Key, Zap } from 'lucide-react';
+import { Sparkles, Check, Flame, Shield, ArrowRight, Key, Zap, ShieldCheck, HelpCircle, HardDrive, RefreshCw } from 'lucide-react';
 import { ALL_ACCESS_MONTHLY, ALL_ACCESS_ANNUAL, FOUNDERS_PROMO_MONTHLY, TOTAL_CATALOG_VALUE } from '../data/plugins';
+
+const COMPARISON_ROWS = [
+  { feature: 'Flagship Plugins Access', single: '1 Plugin Only', allAccess: 'All 15 Flagship Plugins', founders: 'All 15 Flagship Plugins' },
+  { feature: 'PLUGCHOP 2.0 (16-Pad MPC Sampler)', single: '$39 Add-on', allAccess: 'Included', founders: 'Included' },
+  { feature: 'PLUGTNE (Zero-Latency AutoTune)', single: '$49 Add-on', allAccess: 'Included', founders: 'Included' },
+  { feature: 'UNDERGRND (12AX7 Analog Heat)', single: '$29 Add-on', allAccess: 'Included', founders: 'Included' },
+  { feature: 'Future Plugin Releases (Drop 2026/2027)', single: 'Pay-per-release', allAccess: '100% Free Forever', founders: '100% Free Forever' },
+  { feature: 'PluggedIN Central 1-Click Install', single: 'Yes', allAccess: 'Yes (Cloud Sync)', founders: 'Yes (VIP Speed)' },
+  { feature: 'Simultaneous Studio Authorizations', single: '3 Machines', allAccess: '3 Machines', founders: '5 Machines' },
+  { feature: 'Hardware Dongle Requirement', single: 'Zero (No iLok)', allAccess: 'Zero (No iLok)', founders: 'Zero (No iLok)' },
+  { feature: 'Offline Studio Activation', single: 'Supported', allAccess: 'Supported', founders: 'Supported' },
+  { feature: '30-Day Money-Back Guarantee', single: 'Included', allAccess: 'Cancel Anytime', founders: 'Lifetime Access' },
+];
+
+const FAQS = [
+  {
+    q: 'Do I need an iLok USB dongle to run PluggedIN plugins?',
+    a: 'Never. PluggedIN uses modern machine-based hardware authorizations and cloud licensing directly within PluggedIN Central. No fragile, expensive $50 USB dongles required.',
+  },
+  {
+    q: 'What happens to my projects if I ever pause or cancel my All-Access Pass?',
+    a: 'All audio, stems, and mixdowns you bounce or export using our plugins remain 100% yours forever. If you ever pause your pass and want to tweak an older project, you can reactivate for a month or buy individual perpetual licenses.',
+  },
+  {
+    q: 'Can I purchase single plugins permanently without a subscription?',
+    a: 'Absolutely. Every single plugin in our suite is available for direct perpetual purchase with lifetime updates and zero recurring fees.',
+  },
+  {
+    q: 'Are PluggedIN plugins compatible with Apple Silicon (M1/M2/M3/M4)?',
+    a: 'Yes! All plugins are compiled natively for ARM64 Apple Silicon as well as Intel x86_64, running natively in Logic Pro, FL Studio, Ableton Live, and Pro Tools.',
+  },
+];
 
 export const PricingSection: React.FC = () => {
   const [billingCycle, setBillingCycle] = useState<'monthly' | 'annual'>('monthly');
@@ -207,6 +239,54 @@ export const PricingSection: React.FC = () => {
             <span>Redeem VIP Code</span>
           </Link>
         </div>
+      </div>
+
+      {/* Slate Digital Style Complete Feature Comparison Table */}
+      <div className="mt-20 max-w-5xl mx-auto rounded-3xl bg-studio-900/70 border border-white/10 p-6 sm:p-10">
+        <div className="text-center max-w-2xl mx-auto mb-10">
+          <h3 className="text-2xl sm:text-3xl font-black text-white">Compare Plan Features</h3>
+          <p className="text-xs sm:text-sm text-slate-400 mt-2">
+            Why spend $799+ on individual perpetual licenses when you get the entire studio for $14.99/mo?
+          </p>
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-xs sm:text-sm">
+            <thead>
+              <tr className="border-b border-white/10 text-slate-400 font-mono text-[11px] uppercase tracking-wider">
+                <th className="py-4 px-4">Feature / Benefit</th>
+                <th className="py-4 px-4 text-center">Single Perpetual</th>
+                <th className="py-4 px-4 text-center text-cyber-cyan font-bold">All-Access Pass</th>
+                <th className="py-4 px-4 text-center text-amber-300">VIP Pass</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-white/5">
+              {COMPARISON_ROWS.map((row, idx) => (
+                <tr key={idx} className="hover:bg-white/5 transition-colors">
+                  <td className="py-3.5 px-4 text-slate-300 font-medium">{row.feature}</td>
+                  <td className="py-3.5 px-4 text-center text-slate-400">{row.single}</td>
+                  <td className="py-3.5 px-4 text-center text-white font-bold bg-cyber-cyan/5">{row.allAccess}</td>
+                  <td className="py-3.5 px-4 text-center text-amber-400">{row.founders}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Slate Digital / Waves Style FAQ & Guarantees */}
+      <div className="mt-16 max-w-5xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-6">
+        {FAQS.map((faq, idx) => (
+          <div key={idx} className="glass-panel rounded-2xl p-6 border border-white/10 space-y-2">
+            <div className="flex items-start space-x-3">
+              <HelpCircle className="w-5 h-5 text-cyber-cyan shrink-0 mt-0.5" />
+              <div>
+                <h4 className="text-sm font-bold text-white">{faq.q}</h4>
+                <p className="text-xs text-slate-400 mt-1 leading-relaxed">{faq.a}</p>
+              </div>
+            </div>
+          </div>
+        ))}
       </div>
     </section>
   );

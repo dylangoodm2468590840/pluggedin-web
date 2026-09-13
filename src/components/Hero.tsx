@@ -2,7 +2,7 @@
 
 import React from 'react';
 import Link from 'next/link';
-import { Sparkles, Download, ArrowRight, Flame, CheckCircle2, Sliders, Music, Zap } from 'lucide-react';
+import { Sparkles, Download, ArrowRight, Flame, CheckCircle2, Sliders, Music, Zap, Play, Radio } from 'lucide-react';
 import { FOUNDERS_SPOTS_REMAINING, FOUNDERS_SPOTS_TOTAL, TOTAL_CATALOG_VALUE } from '../data/plugins';
 
 export const Hero: React.FC = () => {
@@ -126,8 +126,17 @@ export const Hero: React.FC = () => {
                     </Link>
                   </div>
                   <div className="flex items-center justify-between pt-3 border-t border-white/5 text-xs">
-                    <span className="font-mono text-amber-400 font-bold">$39 Perpetual</span>
-                    <span className="text-[11px] text-slate-400">or with All-Access</span>
+                    <div>
+                      <span className="font-mono text-amber-400 font-bold block">$39 Perpetual</span>
+                      <span className="text-[10px] text-slate-500">or with All-Access</span>
+                    </div>
+                    <a
+                      href="#audio-demo"
+                      className="px-3 py-1.5 rounded-lg bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 font-bold text-xs border border-amber-500/30 flex items-center space-x-1.5 transition-all shadow-glow-amber"
+                    >
+                      <Play className="w-3 h-3 fill-current" />
+                      <span>Audition Tone</span>
+                    </a>
                   </div>
                 </div>
 
@@ -156,8 +165,17 @@ export const Hero: React.FC = () => {
                     </Link>
                   </div>
                   <div className="flex items-center justify-between pt-3 border-t border-white/5 text-xs">
-                    <span className="font-mono text-cyber-cyan font-bold">$49 Perpetual</span>
-                    <span className="text-[11px] text-slate-400">or with All-Access</span>
+                    <div>
+                      <span className="font-mono text-cyber-cyan font-bold block">$49 Perpetual</span>
+                      <span className="text-[10px] text-slate-500">or with All-Access</span>
+                    </div>
+                    <a
+                      href="#audio-demo"
+                      className="px-3 py-1.5 rounded-lg bg-cyber-cyan/15 hover:bg-cyber-cyan/25 text-cyber-cyan font-bold text-xs border border-cyber-cyan/30 flex items-center space-x-1.5 transition-all shadow-glow-cyan"
+                    >
+                      <Play className="w-3 h-3 fill-current" />
+                      <span>Audition Tone</span>
+                    </a>
                   </div>
                 </div>
 
@@ -186,8 +204,17 @@ export const Hero: React.FC = () => {
                     </Link>
                   </div>
                   <div className="flex items-center justify-between pt-3 border-t border-white/5 text-xs">
-                    <span className="font-mono text-cyber-rose font-bold">$29 Perpetual</span>
-                    <span className="text-[11px] text-slate-400">or with All-Access</span>
+                    <div>
+                      <span className="font-mono text-cyber-rose font-bold block">$29 Perpetual</span>
+                      <span className="text-[10px] text-slate-500">or with All-Access</span>
+                    </div>
+                    <a
+                      href="#audio-demo"
+                      className="px-3 py-1.5 rounded-lg bg-cyber-rose/15 hover:bg-cyber-rose/25 text-cyber-rose font-bold text-xs border border-cyber-rose/30 flex items-center space-x-1.5 transition-all shadow-glow-rose"
+                    >
+                      <Play className="w-3 h-3 fill-current" />
+                      <span>Audition Tone</span>
+                    </a>
                   </div>
                 </div>
               </div>
