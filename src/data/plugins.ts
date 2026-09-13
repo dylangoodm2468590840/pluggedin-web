@@ -353,7 +353,7 @@ export const DEMO_TRACKS: DemoTrack[] = [
     title: 'Lead Vocal Chain (Dylan Desktop Stem)',
     genre: 'Travis Scott Hard-Tune • F Minor',
     pluginUsed: 'PLUGTNE + PLUGRACK + PLUGVOX + PLUGVERB',
-    description: 'Direct from Dylan\'s desktop microphone in F Minor. Featuring Travis Scott 0ms hard autotune snapping and the PLUGRACK Cactus Crisp vocal preset. Toggle individual plugins on/off in real time.',
+    description: 'Direct from Dylan\'s desktop microphone in F Minor. Featuring Travis Scott 0ms hard autotune snapping and the PLUGRACK Studio Lead Chain vocal preset. Toggle individual plugins on/off in real time.',
     dryLabel: 'Raw Desktop Mic (Bypass All)',
     wetLabel: 'Full Flagship Vocal Chain'
   },

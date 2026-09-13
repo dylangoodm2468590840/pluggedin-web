@@ -9,20 +9,20 @@ interface PluginMiniPlayerProps {
 
 const PLUGIN_DEMO_MAP: Record<string, { title: string; dry: string; wet: string; dryLabel: string; wetLabel: string; desc: string }> = {
   PLUGTNE: {
-    title: 'Travis Scott 0ms Hard-Tune Comparison',
+    title: 'Travis Scott Hard-Tune Comparison',
     dry: '/audio/vocal_dry.wav',
     wet: '/audio/vocal_tuned.wav',
-    dryLabel: 'Raw Dylan Desktop Mic',
-    wetLabel: 'PLUGTNE Travis Scott Hard-Tune',
-    desc: 'Prominent 0ms retune speed with rigid scale snapping to F Minor and characteristic robotic stair-stepping.',
+    dryLabel: 'Raw Dylan Studio Mic (Dry)',
+    wetLabel: 'PLUGTNE 0ms F Minor Hard-Tune',
+    desc: 'Prominent 0ms retune speed with rigid scale snapping to F Minor, vocal clarity, and characteristic robotic stair-stepping.',
   },
   PlugRack: {
-    title: 'Cactus Crisp Vocal Chain Preset',
+    title: 'Commercial Studio Vocal Chain Preset',
     dry: '/audio/vocal_dry.wav',
     wet: '/audio/vocal_wet.wav',
-    dryLabel: 'Raw Unprocessed Mic',
-    wetLabel: 'PLUGRACK Cactus Crisp Lead',
-    desc: 'Flagship modular rack hosting Travis Scott hard-tune, 12kHz harmonic air exciter, RVox dynamics, and stereo plate space.',
+    dryLabel: 'Raw Dylan Studio Mic (Dry)',
+    wetLabel: 'PLUGRACK Commercial Lead Chain',
+    desc: 'Flagship modular rack hosting F Minor hard-tuning, surgical highpass & dynamic de-essing, Pultec linear air, and lush plate reverb.',
   },
   PlugChop: {
     title: 'Vintage Soul Record Chop',
