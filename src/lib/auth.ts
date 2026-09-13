@@ -254,3 +254,40 @@ export function verifySessionToken(token: string): { userId: string; email: stri
     return null;
   }
 }
+
+export async function grantUserAccess(
+  userId: string,
+  grant: {
+    tier?: 'All-Access Studio Pass' | 'Founder Member' | 'Standard Member';
+    pluginId?: string;
+    isLifetime?: boolean;
+  }
+): Promise<UserSafeProfile> {
+  const users = readUsers();
+  const user = users.find((u) => u.id === userId);
+  if (!user) {
+    throw new Error('User not found');
+  }
+
+  if (grant.tier) {
+    user.tier = grant.tier;
+    user.subscriptionStatus = 'active';
+    if (!user.ownedPlugins.includes('ALL_15_PLUGINS')) {
+      user.ownedPlugins.push('ALL_15_PLUGINS');
+    }
+  }
+
+  if (grant.pluginId) {
+    if (!user.ownedPlugins.includes(grant.pluginId)) {
+      user.ownedPlugins.push(grant.pluginId);
+    }
+  }
+
+  if (grant.isLifetime) {
+    user.isLifetimeVIP = true;
+  }
+
+  writeUsers(users);
+  return toSafeProfile(user);
+}
+

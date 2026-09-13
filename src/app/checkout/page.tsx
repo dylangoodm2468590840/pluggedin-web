@@ -17,12 +17,16 @@ import {
   Check,
   Laptop,
 } from 'lucide-react';
-import { ALL_ACCESS_MONTHLY, ALL_ACCESS_ANNUAL, TOTAL_CATALOG_VALUE } from '../../data/plugins';
+import { PayPalScriptProvider, PayPalButtons } from '@paypal/react-paypal-js';
+import { ALL_ACCESS_MONTHLY, ALL_ACCESS_ANNUAL, TOTAL_CATALOG_VALUE, PLUGINS_DATA } from '../../data/plugins';
+
+const PAYPAL_CLIENT_ID = process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID || '';
 
 export default function CheckoutPage() {
   const router = useRouter();
 
   const [plan, setPlan] = useState<'monthly' | 'annual'>('monthly');
+  const [pluginId, setPluginId] = useState<string | null>(null);
   const [currentUser, setCurrentUser] = useState<any | null>(null);
 
   // Auth fields if user not logged in
@@ -50,7 +54,11 @@ export default function CheckoutPage() {
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search);
       const planParam = params.get('plan');
-      if (planParam === 'annual') {
+      const pluginParam = params.get('plugin');
+
+      if (pluginParam) {
+        setPluginId(pluginParam);
+      } else if (planParam === 'annual') {
         setPlan('annual');
       }
 
@@ -68,7 +76,14 @@ export default function CheckoutPage() {
     }
   }, []);
 
-  const basePrice = plan === 'monthly' ? ALL_ACCESS_MONTHLY : ALL_ACCESS_ANNUAL;
+  const selectedPlugin = pluginId ? PLUGINS_DATA.find((p) => p.id === pluginId) : null;
+
+  const basePrice = selectedPlugin
+    ? selectedPlugin.salePrice
+    : plan === 'monthly'
+    ? ALL_ACCESS_MONTHLY
+    : ALL_ACCESS_ANNUAL;
+
   const discountAmount = appliedPromo
     ? Math.round((basePrice * appliedPromo.discountPercent) / 100)
     : 0;
@@ -105,13 +120,12 @@ export default function CheckoutPage() {
     }
   };
 
-  const handleCompleteCheckout = async (e: React.FormEvent) => {
-    e.preventDefault();
+  // Handler for 100% Free VIP promo checkout
+  const handleFreeCheckout = async () => {
     setCheckoutError(null);
     setSubmitting(true);
 
     try {
-      // If user is not logged in, register them or log them in
       if (!currentUser) {
         if (!email || !password) {
           setCheckoutError('Please enter your email and choose a password for your account.');
@@ -131,7 +145,6 @@ export default function CheckoutPage() {
         const regData = await regRes.json();
 
         if (!regRes.ok || !regData.success) {
-          // If already exists, try logging in
           const loginRes = await fetch('/api/auth/login', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -165,69 +178,94 @@ export default function CheckoutPage() {
     <div className="py-16 max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 min-h-[75vh]">
       <div className="text-center max-w-xl mx-auto mb-10 space-y-2">
         <span className="text-[10px] font-black uppercase tracking-wider px-3 py-1 rounded-full bg-cyber-cyan/10 text-cyber-cyan border border-cyber-cyan/30">
-          SECURE 256-BIT CHECKOUT
+          SECURE PAYPAL CHECKOUT
         </span>
         <h1 className="text-3xl sm:text-4xl font-black text-white mt-3">
-          Claim Your All-Access Studio Pass
+          {selectedPlugin
+            ? `Claim Perpetual License: ${selectedPlugin.name}`
+            : 'Claim Your All-Access Studio Pass'}
         </h1>
         <p className="text-xs sm:text-sm text-slate-400">
-          Instant access to all 15 plugins, PluggedIN Central cloud licensing, and all future drops.
+          {selectedPlugin
+            ? 'Lifetime perpetual license with free updates and 3 machine authorizations.'
+            : 'Instant access to all 15 plugins, PluggedIN Central cloud licensing, and all future drops.'}
         </p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-12 gap-8 items-start">
         {/* Left Column: Plan & Account Details */}
         <div className="md:col-span-7 space-y-6">
-          {/* Plan Duration Selector */}
-          <div className="glass-panel rounded-3xl p-6 border border-white/10 space-y-4">
-            <h3 className="text-sm font-black uppercase text-white tracking-wider">
-              1. Select Billing Period
-            </h3>
+          {/* Plan Duration Selector (Only shown if buying Pass, not single plugin) */}
+          {!selectedPlugin ? (
+            <div className="glass-panel rounded-3xl p-6 border border-white/10 space-y-4">
+              <h3 className="text-sm font-black uppercase text-white tracking-wider">
+                1. Select Billing Period
+              </h3>
 
-            <div className="grid grid-cols-2 gap-3">
-              <button
-                type="button"
-                onClick={() => setPlan('monthly')}
-                className={`p-4 rounded-2xl border text-left transition-all ${
-                  plan === 'monthly'
-                    ? 'border-cyber-cyan bg-cyber-cyan/10 shadow-glow-cyan'
-                    : 'border-white/10 bg-studio-900 hover:border-white/20'
-                }`}
-              >
-                <span className="text-xs font-bold text-slate-300 block">Monthly Pass</span>
-                <span className="text-2xl font-black text-white font-mono block mt-1">
-                  ${ALL_ACCESS_MONTHLY}
-                  <span className="text-xs text-slate-400 font-sans font-normal"> / mo</span>
-                </span>
-                <span className="text-[10px] text-slate-400 mt-1 block">Billed monthly • Cancel anytime</span>
-              </button>
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  type="button"
+                  onClick={() => setPlan('monthly')}
+                  className={`p-4 rounded-2xl border text-left transition-all ${
+                    plan === 'monthly'
+                      ? 'border-cyber-cyan bg-cyber-cyan/10 shadow-glow-cyan'
+                      : 'border-white/10 bg-studio-900 hover:border-white/20'
+                  }`}
+                >
+                  <span className="text-xs font-bold text-slate-300 block">Monthly Pass</span>
+                  <span className="text-2xl font-black text-white font-mono block mt-1">
+                    ${ALL_ACCESS_MONTHLY}
+                    <span className="text-xs text-slate-400 font-sans font-normal"> / mo</span>
+                  </span>
+                  <span className="text-[10px] text-slate-400 mt-1 block">Billed monthly • Cancel anytime</span>
+                </button>
 
-              <button
-                type="button"
-                onClick={() => setPlan('annual')}
-                className={`p-4 rounded-2xl border text-left transition-all relative overflow-hidden ${
-                  plan === 'annual'
-                    ? 'border-cyber-purple bg-cyber-purple/10 shadow-glow-purple'
-                    : 'border-white/10 bg-studio-900 hover:border-white/20'
-                }`}
-              >
-                <span className="absolute top-2 right-2 text-[9px] font-black uppercase px-2 py-0.5 rounded-full bg-cyber-cyan text-black shadow">
-                  SAVE 45%
-                </span>
-                <span className="text-xs font-bold text-slate-300 block">Annual Pass</span>
-                <span className="text-2xl font-black text-white font-mono block mt-1">
-                  ${ALL_ACCESS_ANNUAL}
-                  <span className="text-xs text-slate-400 font-sans font-normal"> / yr</span>
-                </span>
-                <span className="text-[10px] text-slate-400 mt-1 block">Only $8.25/mo • 1 Year Unlimited</span>
-              </button>
+                <button
+                  type="button"
+                  onClick={() => setPlan('annual')}
+                  className={`p-4 rounded-2xl border text-left transition-all relative overflow-hidden ${
+                    plan === 'annual'
+                      ? 'border-cyber-purple bg-cyber-purple/10 shadow-glow-purple'
+                      : 'border-white/10 bg-studio-900 hover:border-white/20'
+                  }`}
+                >
+                  <span className="absolute top-2 right-2 text-[9px] font-black uppercase px-2 py-0.5 rounded-full bg-cyber-cyan text-black shadow">
+                    SAVE 45%
+                  </span>
+                  <span className="text-xs font-bold text-slate-300 block">Annual Pass</span>
+                  <span className="text-2xl font-black text-white font-mono block mt-1">
+                    ${ALL_ACCESS_ANNUAL}
+                    <span className="text-xs text-slate-400 font-sans font-normal"> / yr</span>
+                  </span>
+                  <span className="text-[10px] text-slate-400 mt-1 block">Only $8.25/mo • 1 Year Unlimited</span>
+                </button>
+              </div>
             </div>
-          </div>
+          ) : (
+            <div className="glass-panel rounded-3xl p-6 border border-white/10 space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-cyber-cyan/10 text-cyber-cyan border border-cyber-cyan/30">
+                  {selectedPlugin.category}
+                </span>
+                <span className="text-xs font-mono text-emerald-400 font-bold">PERPETUAL LICENSE</span>
+              </div>
+              <h3 className="text-xl font-black text-white">{selectedPlugin.name}</h3>
+              <p className="text-xs text-slate-400">{selectedPlugin.subtitle}</p>
+              <div className="pt-2">
+                <Link
+                  href="/checkout"
+                  className="text-xs text-cyber-cyan hover:underline font-semibold"
+                >
+                  &larr; Switch to All-Access Studio Pass ($14.99/mo)
+                </Link>
+              </div>
+            </div>
+          )}
 
           {/* Account Creation / Session Info */}
           <div className="glass-panel rounded-3xl p-6 border border-white/10 space-y-4">
             <h3 className="text-sm font-black uppercase text-white tracking-wider">
-              2. Studio Account Credentials
+              {selectedPlugin ? '1. Studio Account Credentials' : '2. Studio Account Credentials'}
             </h3>
 
             {currentUser ? (
@@ -237,7 +275,7 @@ export default function CheckoutPage() {
                   <span className="text-sm font-bold text-white">{currentUser.email}</span>
                 </div>
                 <span className="text-[10px] font-bold text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-full border border-emerald-500/20">
-                  Ready to activate
+                  Connected
                 </span>
               </div>
             ) : (
@@ -303,7 +341,11 @@ export default function CheckoutPage() {
 
             <div className="space-y-3 text-xs">
               <div className="flex justify-between text-slate-300">
-                <span>All-Access Studio Pass ({plan === 'monthly' ? 'Monthly' : 'Annual'})</span>
+                <span>
+                  {selectedPlugin
+                    ? `${selectedPlugin.name} (Perpetual)`
+                    : `All-Access Studio Pass (${plan === 'monthly' ? 'Monthly' : 'Annual'})`}
+                </span>
                 <span className="font-mono text-white font-bold">${basePrice}</span>
               </div>
 
@@ -322,7 +364,7 @@ export default function CheckoutPage() {
               </div>
             </div>
 
-            {/* Subtle Promo Code Section (Unpromoted, Expandable) */}
+            {/* Subtle Promo Code Section */}
             <div className="pt-3 border-t border-white/5">
               {!appliedPromo ? (
                 <div>
@@ -397,21 +439,116 @@ export default function CheckoutPage() {
               </div>
             )}
 
-            {/* Checkout Action Button */}
-            <button
-              type="button"
-              onClick={handleCompleteCheckout}
-              disabled={submitting}
-              className="w-full py-4 rounded-xl bg-gradient-to-r from-cyber-cyan to-blue-600 hover:brightness-110 text-black text-sm font-black shadow-glow-cyan transition-all disabled:opacity-50 flex items-center justify-center space-x-2"
-            >
-              {submitting ? (
-                <span>Processing Activation...</span>
-              ) : finalPrice === 0 ? (
-                <span>Activate Free Pass ($0.00) &rarr;</span>
+            {/* Payment Section */}
+            <div className="pt-2">
+              {finalPrice === 0 ? (
+                // 100% Free Promo (Dylan's friends)
+                <button
+                  type="button"
+                  onClick={handleFreeCheckout}
+                  disabled={submitting}
+                  className="w-full py-4 rounded-xl bg-gradient-to-r from-cyber-cyan to-blue-600 hover:brightness-110 text-black text-sm font-black shadow-glow-cyan transition-all disabled:opacity-50 flex items-center justify-center space-x-2"
+                >
+                  {submitting ? (
+                    <span>Processing Activation...</span>
+                  ) : (
+                    <span>Activate Free Pass ($0.00) &rarr;</span>
+                  )}
+                </button>
+              ) : PAYPAL_CLIENT_ID ? (
+                // Official PayPal & Card Smart Buttons
+                <div className="space-y-3">
+                  {!currentUser && (!email || !password) && (
+                    <p className="text-[11px] text-amber-300/90 bg-amber-500/10 p-2.5 rounded-xl border border-amber-500/20 text-center">
+                      Please enter your email and password on the left so your license can be attached immediately.
+                    </p>
+                  )}
+
+                  <PayPalScriptProvider
+                    options={{
+                      clientId: PAYPAL_CLIENT_ID,
+                      currency: 'USD',
+                      intent: 'capture',
+                    }}
+                  >
+                    <PayPalButtons
+                      style={{
+                        layout: 'vertical',
+                        color: 'gold',
+                        shape: 'rect',
+                        label: 'pay',
+                      }}
+                      disabled={!currentUser && (!email || !password)}
+                      createOrder={async () => {
+                        const res = await fetch('/api/paypal/create-order', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({
+                            plan: selectedPlugin ? undefined : plan,
+                            pluginId: selectedPlugin ? selectedPlugin.id : undefined,
+                            promoCode: appliedPromo?.code,
+                          }),
+                        });
+                        const data = await res.json();
+                        if (!data.success) {
+                          throw new Error(data.error || 'Failed to create PayPal order');
+                        }
+                        return data.orderId;
+                      }}
+                      onApprove={async (data) => {
+                        setSubmitting(true);
+                        try {
+                          const res = await fetch('/api/paypal/capture-order', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                              orderId: data.orderID,
+                              plan: selectedPlugin ? undefined : plan,
+                              pluginId: selectedPlugin ? selectedPlugin.id : undefined,
+                              accountInfo: currentUser
+                                ? undefined
+                                : {
+                                    email: email.trim(),
+                                    password,
+                                    displayName: displayName.trim(),
+                                  },
+                            }),
+                          });
+                          const resData = await res.json();
+                          if (resData.success) {
+                            setCheckoutSuccess(true);
+                            setTimeout(() => {
+                              router.push('/account?checkout=success');
+                            }, 1500);
+                          } else {
+                            setCheckoutError(resData.error || 'Payment capture failed');
+                          }
+                        } catch (err: any) {
+                          setCheckoutError(err.message || 'Error completing checkout');
+                        } finally {
+                          setSubmitting(false);
+                        }
+                      }}
+                      onError={(err) => {
+                        console.error('PayPal Buttons Error:', err);
+                        setCheckoutError('PayPal payment encountered an error. Please try again.');
+                      }}
+                    />
+                  </PayPalScriptProvider>
+                </div>
               ) : (
-                <span>Complete Checkout • ${finalPrice} &rarr;</span>
+                // If Client ID not yet pasted
+                <div className="p-4 rounded-2xl bg-studio-900 border border-cyber-cyan/30 text-center space-y-2">
+                  <div className="inline-flex items-center space-x-1.5 text-xs font-bold text-cyber-cyan">
+                    <ShieldCheck className="w-4 h-4" />
+                    <span>PayPal Integration Armed &amp; Ready</span>
+                  </div>
+                  <p className="text-[11px] text-slate-400">
+                    Awaiting PayPal Live Client ID in <code className="text-cyber-cyan">.env.local</code>. Once pasted, live PayPal &amp; Card checkout activates automatically!
+                  </p>
+                </div>
               )}
-            </button>
+            </div>
 
             <div className="space-y-2 pt-3 border-t border-white/5 text-[11px] text-slate-400">
               <div className="flex items-center space-x-2">
@@ -420,7 +557,7 @@ export default function CheckoutPage() {
               </div>
               <div className="flex items-center space-x-2">
                 <ShieldCheck className="w-3.5 h-3.5 text-cyber-cyan shrink-0" />
-                <span>30-Day Money-Back Guarantee • Cancel Anytime</span>
+                <span>Official PayPal Buyer &amp; Seller Protection Included</span>
               </div>
             </div>
           </div>
