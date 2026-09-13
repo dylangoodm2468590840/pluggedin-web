@@ -1,47 +1,126 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Play, Pause, Volume2, Sparkles, Sliders, Waves } from 'lucide-react';
+import { Play, Pause, Volume2, Sparkles, Waves, VolumeX } from 'lucide-react';
 import { DEMO_TRACKS } from '../data/plugins';
+
+const TRACK_AUDIO_MAP: Record<string, { dry: string; wet: string }> = {
+  trap_vocal: {
+    dry: '/audio/vocal_dry.wav',
+    wet: '/audio/vocal_wet.wav',
+  },
+  hiphop_sample: {
+    dry: '/audio/sample_dry.wav',
+    wet: '/audio/sample_wet.wav',
+  },
+  distorted_808: {
+    dry: '/audio/808_dry.wav',
+    wet: '/audio/808_wet.wav',
+  },
+};
 
 export const AudioDemoPlayer: React.FC = () => {
   const [selectedTrackIndex, setSelectedTrackIndex] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [mode, setMode] = useState<'dry' | 'wet'>('wet');
-  const [progress, setProgress] = useState(35);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(8);
 
   const currentTrack = DEMO_TRACKS[selectedTrackIndex];
-  const audioContextRef = useRef<AudioContext | null>(null);
-  const isPlayingRef = useRef(false);
+  const audioFiles = TRACK_AUDIO_MAP[currentTrack.id] || TRACK_AUDIO_MAP.trap_vocal;
 
-  // Toggle playback simulation
+  const dryAudioRef = useRef<HTMLAudioElement | null>(null);
+  const wetAudioRef = useRef<HTMLAudioElement | null>(null);
+
+  // Sync audio sources when track changes
+  useEffect(() => {
+    if (dryAudioRef.current && wetAudioRef.current) {
+      dryAudioRef.current.src = audioFiles.dry;
+      wetAudioRef.current.src = audioFiles.wet;
+      dryAudioRef.current.currentTime = 0;
+      wetAudioRef.current.currentTime = 0;
+
+      if (isPlaying) {
+        dryAudioRef.current.play().catch(() => {});
+        wetAudioRef.current.play().catch(() => {});
+      }
+    }
+  }, [selectedTrackIndex, audioFiles.dry, audioFiles.wet]);
+
+  // Handle Mode (Dry vs Wet mute toggle for gapless real-time A/B flip)
+  useEffect(() => {
+    if (dryAudioRef.current && wetAudioRef.current) {
+      if (mode === 'wet') {
+        wetAudioRef.current.muted = false;
+        wetAudioRef.current.volume = 1.0;
+        dryAudioRef.current.muted = true;
+      } else {
+        dryAudioRef.current.muted = false;
+        dryAudioRef.current.volume = 1.0;
+        wetAudioRef.current.muted = true;
+      }
+    }
+  }, [mode]);
+
+  // Toggle Play / Pause
   const togglePlay = () => {
-    setIsPlaying(!isPlaying);
+    if (!dryAudioRef.current || !wetAudioRef.current) return;
+
+    if (isPlaying) {
+      dryAudioRef.current.pause();
+      wetAudioRef.current.pause();
+      setIsPlaying(false);
+    } else {
+      // Sync positions
+      const pos = dryAudioRef.current.currentTime;
+      wetAudioRef.current.currentTime = pos;
+
+      dryAudioRef.current.play().catch(() => {});
+      wetAudioRef.current.play().catch(() => {});
+      setIsPlaying(true);
+    }
   };
 
-  useEffect(() => {
-    let interval: NodeJS.Timeout;
-    if (isPlaying) {
-      interval = setInterval(() => {
-        setProgress((prev) => (prev >= 100 ? 0 : prev + 1));
-      }, 200);
+  // Time update
+  const handleTimeUpdate = () => {
+    if (dryAudioRef.current) {
+      setCurrentTime(dryAudioRef.current.currentTime);
+      if (dryAudioRef.current.duration) {
+        setDuration(dryAudioRef.current.duration);
+      }
     }
-    return () => clearInterval(interval);
-  }, [isPlaying]);
+  };
+
+  const progressPercent = duration > 0 ? (currentTime / duration) * 100 : 0;
 
   return (
     <section className="py-20 bg-studio-900/40 border-y border-white/5 relative overflow-hidden">
+      {/* Hidden Synchronized HTML5 Audio Elements */}
+      <audio
+        ref={dryAudioRef}
+        src={audioFiles.dry}
+        loop
+        muted={mode !== 'dry'}
+        onTimeUpdate={handleTimeUpdate}
+      />
+      <audio
+        ref={wetAudioRef}
+        src={audioFiles.wet}
+        loop
+        muted={mode !== 'wet'}
+      />
+
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
         <div className="text-center max-w-2xl mx-auto mb-12 space-y-3">
           <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-cyber-purple/10 border border-cyber-purple/20 text-xs font-bold text-cyber-purple">
             <Waves className="w-3.5 h-3.5" />
-            <span>HEAR THE SOUND IN ACTION</span>
+            <span>REAL PLUGIN DSP AUDIO</span>
           </div>
           <h2 className="text-3xl sm:text-4xl font-black text-white">
             Interactive A/B Audio Switcher
           </h2>
           <p className="text-sm text-slate-400">
-            Compare dry raw recordings against the processed master. Flip back and forth in real time to hear the PluggedIN difference.
+            Rendered directly from our actual C++ DSP algorithms. Switch between Dry and Wet in real time without audio drops.
           </p>
         </div>
 
@@ -52,7 +131,7 @@ export const AudioDemoPlayer: React.FC = () => {
               key={track.id}
               onClick={() => {
                 setSelectedTrackIndex(idx);
-                setProgress(10);
+                setCurrentTime(0);
               }}
               className={`px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all whitespace-nowrap flex items-center space-x-2 ${
                 selectedTrackIndex === idx
@@ -138,14 +217,14 @@ export const AudioDemoPlayer: React.FC = () => {
                       <span className={`w-2 h-2 rounded-full ${isPlaying ? 'bg-emerald-400 animate-pulse' : 'bg-slate-600'}`} />
                     </div>
                     <span className="text-[11px] font-mono text-slate-400">
-                      Mode: <strong className={mode === 'wet' ? 'text-cyber-cyan' : 'text-slate-300'}>{mode.toUpperCase()}</strong>
+                      Channel: <strong className={mode === 'wet' ? 'text-cyber-cyan' : 'text-slate-300'}>{mode.toUpperCase()}</strong>
                     </span>
                   </div>
                 </div>
 
                 <div className="flex items-center space-x-2 text-xs font-mono text-slate-400">
                   <Volume2 className="w-4 h-4 text-cyber-cyan" />
-                  <span>32-bit Float</span>
+                  <span>44.1kHz • 16-Bit WAV</span>
                 </div>
               </div>
 
@@ -155,7 +234,7 @@ export const AudioDemoPlayer: React.FC = () => {
                   const baseHeight = ((Math.sin(i * 0.4) + 1.2) / 2.2) * 80 + 15;
                   const boost = mode === 'wet' ? 1.25 : 0.75;
                   const calculatedHeight = Math.min(100, baseHeight * boost);
-                  const active = (i / 36) * 100 <= progress;
+                  const active = (i / 36) * 100 <= progressPercent;
 
                   return (
                     <div
@@ -183,12 +262,12 @@ export const AudioDemoPlayer: React.FC = () => {
                     className={`h-full transition-all duration-200 ${
                       mode === 'wet' ? 'bg-cyber-cyan shadow-glow-cyan' : 'bg-slate-400'
                     }`}
-                    style={{ width: `${progress}%` }}
+                    style={{ width: `${progressPercent}%` }}
                   />
                 </div>
                 <div className="flex justify-between text-[10px] font-mono text-slate-500">
-                  <span>0:{(progress * 0.3).toFixed(0).padStart(2, '0')}</span>
-                  <span>0:30 (Loop)</span>
+                  <span>0:0{Math.floor(currentTime)}</span>
+                  <span>0:08 (Loop)</span>
                 </div>
               </div>
             </div>

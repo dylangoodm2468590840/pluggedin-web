@@ -61,6 +61,25 @@ export const PluginCard: React.FC<PluginCardProps> = ({ plugin }) => {
           </div>
         </div>
 
+        {/* Real Plugin Hardware GUI Screenshot */}
+        <Link 
+          href={`/plugins/${plugin.id}`} 
+          className="mt-4 block relative rounded-2xl overflow-hidden bg-studio-950/90 border border-white/10 group/img aspect-[16/10] shadow-inner"
+        >
+          <div className="absolute inset-0 bg-gradient-to-t from-studio-950/60 via-transparent to-transparent opacity-60 group-hover/img:opacity-20 transition-opacity z-10" />
+          <img
+            src={`/images/plugins/${plugin.id}.png`}
+            alt={`${plugin.name} Real Interface`}
+            className="w-full h-full object-cover object-top group-hover/img:scale-105 transition-transform duration-500"
+            loading="lazy"
+          />
+          <div className="absolute top-2 right-2 z-20">
+            <span className="text-[9px] font-mono font-bold bg-studio-950/80 backdrop-blur-sm text-cyber-cyan border border-cyber-cyan/30 px-2 py-0.5 rounded-full shadow">
+              REAL VST3
+            </span>
+          </div>
+        </Link>
+
         {/* Name & Subtitle */}
         <div className="mt-4">
           <div className="flex items-center justify-between">

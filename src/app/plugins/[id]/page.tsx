@@ -87,6 +87,29 @@ export default function PluginDetailPage({ params }: { params: { id: string } })
         </div>
       </div>
 
+      {/* Real Hardware VST3 Interface Showcase */}
+      <div className="mt-10 glass-panel rounded-3xl p-4 sm:p-6 border border-white/10 relative overflow-hidden group">
+        <div className="flex items-center justify-between pb-4 border-b border-white/10 px-2">
+          <div className="flex items-center space-x-2">
+            <span className="w-2.5 h-2.5 rounded-full bg-cyber-cyan animate-pulse" />
+            <span className="text-xs font-mono font-bold text-white uppercase tracking-wider">
+              Authentic VST3 / AU Hardware GUI Faceplate
+            </span>
+          </div>
+          <span className="text-xs font-mono text-slate-400 bg-white/5 px-2.5 py-1 rounded-lg border border-white/10">
+            Native JUCE 7 • 64-Bit Float
+          </span>
+        </div>
+
+        <div className="mt-4 rounded-2xl overflow-hidden bg-studio-950/80 border border-white/10 shadow-2xl relative">
+          <img
+            src={`/images/plugins/${plugin.id}.png`}
+            alt={`${plugin.name} Full Faceplate Screenshot`}
+            className="w-full h-auto object-contain mx-auto"
+          />
+        </div>
+      </div>
+
       {/* Feature Breakdown & Specifications */}
       <div className="mt-12 grid grid-cols-1 md:grid-cols-2 gap-8">
         {/* Core Features */}

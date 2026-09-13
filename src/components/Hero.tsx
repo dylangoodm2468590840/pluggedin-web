@@ -102,7 +102,7 @@ export const Hero: React.FC = () => {
               {/* 3 Featured Units Inside the Rack */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 {/* Rack Unit 1: PlugChop */}
-                <div className="rounded-2xl bg-studio-950 p-5 border border-amber-500/30 shadow-glow-amber flex flex-col justify-between">
+                <div className="rounded-2xl bg-studio-950 p-5 border border-amber-500/30 shadow-glow-amber flex flex-col justify-between group">
                   <div>
                     <div className="flex items-center justify-between">
                       <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30">
@@ -113,21 +113,17 @@ export const Hero: React.FC = () => {
                     <h3 className="text-lg font-black text-white mt-3">PLUGCHOP 2.0</h3>
                     <p className="text-xs text-slate-400 mt-1">16-Pad playable slicing MPC workstation with choke groups & auto-transient detection.</p>
                     
-                    {/* Simulated 16 pads */}
-                    <div className="grid grid-cols-4 gap-1.5 my-4">
-                      {Array.from({ length: 16 }).map((_, i) => (
-                        <div
-                          key={i}
-                          className={`h-7 rounded-md flex items-center justify-center text-[9px] font-mono font-bold transition-all ${
-                            i === 5 || i === 9 || i === 12
-                              ? 'bg-amber-500 text-black shadow-glow-amber'
-                              : 'bg-studio-850 text-slate-400 hover:bg-studio-800'
-                          }`}
-                        >
-                          P{i + 1}
-                        </div>
-                      ))}
-                    </div>
+                    {/* Authentic Hardware GUI Screenshot */}
+                    <Link href="/plugins/PlugChop" className="my-4 block rounded-xl overflow-hidden border border-amber-500/20 bg-black/40 aspect-[16/10] relative group-hover:border-amber-500/40 transition-all">
+                      <img
+                        src="/images/plugins/PlugChop.png"
+                        alt="PLUGCHOP 2.0 Real Interface"
+                        className="w-full h-full object-cover object-top group-hover:scale-105 transition-transform duration-500"
+                      />
+                      <span className="absolute bottom-2 right-2 text-[9px] font-mono font-bold bg-black/80 backdrop-blur-sm text-amber-400 border border-amber-500/30 px-2 py-0.5 rounded-full">
+                        REAL JUCE GUI
+                      </span>
+                    </Link>
                   </div>
                   <div className="flex items-center justify-between pt-3 border-t border-white/5 text-xs">
                     <span className="font-mono text-amber-400 font-bold">$39 Perpetual</span>
@@ -136,7 +132,7 @@ export const Hero: React.FC = () => {
                 </div>
 
                 {/* Rack Unit 2: PLUGTNE */}
-                <div className="rounded-2xl bg-studio-950 p-5 border border-cyber-cyan/30 shadow-glow-cyan flex flex-col justify-between">
+                <div className="rounded-2xl bg-studio-950 p-5 border border-cyber-cyan/30 shadow-glow-cyan flex flex-col justify-between group">
                   <div>
                     <div className="flex items-center justify-between">
                       <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded bg-cyber-cyan/20 text-cyber-cyan border border-cyber-cyan/30">
@@ -147,19 +143,17 @@ export const Hero: React.FC = () => {
                     <h3 className="text-lg font-black text-white mt-3">PLUGTNE v1.0.3</h3>
                     <p className="text-xs text-slate-400 mt-1">Real-time low-latency pitch snap with dual vector oscilloscope & chromatic key scale detector.</p>
                     
-                    {/* Simulated vector oscilloscope */}
-                    <div className="my-4 h-24 rounded-xl bg-studio-900 border border-cyber-cyan/20 flex items-center justify-center p-2 relative overflow-hidden">
-                      <div className="absolute inset-0 bg-cyber-cyan/5"></div>
-                      <div className="w-full flex items-center justify-center space-x-1.5 h-12">
-                        {[40, 65, 80, 50, 95, 70, 85, 60, 90, 75, 45, 85, 60].map((h, i) => (
-                          <div
-                            key={i}
-                            className="w-1.5 bg-cyber-cyan rounded-full animate-waveform"
-                            style={{ height: `${h}%`, animationDelay: `${i * 0.08}s` }}
-                          />
-                        ))}
-                      </div>
-                    </div>
+                    {/* Authentic Hardware GUI Screenshot */}
+                    <Link href="/plugins/PLUGTNE" className="my-4 block rounded-xl overflow-hidden border border-cyber-cyan/20 bg-black/40 aspect-[16/10] relative group-hover:border-cyber-cyan/40 transition-all">
+                      <img
+                        src="/images/plugins/PLUGTNE.png"
+                        alt="PLUGTNE Real Interface"
+                        className="w-full h-full object-cover object-top group-hover:scale-105 transition-transform duration-500"
+                      />
+                      <span className="absolute bottom-2 right-2 text-[9px] font-mono font-bold bg-black/80 backdrop-blur-sm text-cyber-cyan border border-cyber-cyan/30 px-2 py-0.5 rounded-full">
+                        REAL JUCE GUI
+                      </span>
+                    </Link>
                   </div>
                   <div className="flex items-center justify-between pt-3 border-t border-white/5 text-xs">
                     <span className="font-mono text-cyber-cyan font-bold">$49 Perpetual</span>
@@ -168,7 +162,7 @@ export const Hero: React.FC = () => {
                 </div>
 
                 {/* Rack Unit 3: UNDERGRND */}
-                <div className="rounded-2xl bg-studio-950 p-5 border border-cyber-rose/30 shadow-glow-rose flex flex-col justify-between">
+                <div className="rounded-2xl bg-studio-950 p-5 border border-cyber-rose/30 shadow-glow-rose flex flex-col justify-between group">
                   <div>
                     <div className="flex items-center justify-between">
                       <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded bg-cyber-rose/20 text-cyber-rose border border-cyber-rose/30">
@@ -179,21 +173,17 @@ export const Hero: React.FC = () => {
                     <h3 className="text-lg font-black text-white mt-3">UNDERGRND v4.2</h3>
                     <p className="text-xs text-slate-400 mt-1">12AX7 tube saturation, pitch formant demon warping, and sub-bass generator for aggressive trap 808s.</p>
                     
-                    {/* Simulated Tube VU display */}
-                    <div className="my-4 h-24 rounded-xl bg-studio-900 border border-cyber-rose/20 p-3 flex flex-col justify-between">
-                      <div className="flex items-center justify-between text-[10px] font-mono text-slate-400">
-                        <span>12AX7 DRIVE</span>
-                        <span className="text-cyber-rose font-bold">+18.5 dB</span>
-                      </div>
-                      <div className="w-full h-3 bg-studio-950 rounded-full overflow-hidden p-0.5 border border-white/10">
-                        <div className="h-full bg-gradient-to-r from-amber-500 via-orange-500 to-cyber-rose rounded-full" style={{ width: '78%' }} />
-                      </div>
-                      <div className="flex justify-between text-[9px] font-mono text-slate-500">
-                        <span>CLEAN</span>
-                        <span>SATURATE</span>
-                        <span className="text-rose-400">DEMON</span>
-                      </div>
-                    </div>
+                    {/* Authentic Hardware GUI Screenshot */}
+                    <Link href="/plugins/UNDERGRND" className="my-4 block rounded-xl overflow-hidden border border-cyber-rose/20 bg-black/40 aspect-[16/10] relative group-hover:border-cyber-rose/40 transition-all">
+                      <img
+                        src="/images/plugins/UNDERGRND.png"
+                        alt="UNDERGRND Real Interface"
+                        className="w-full h-full object-cover object-top group-hover:scale-105 transition-transform duration-500"
+                      />
+                      <span className="absolute bottom-2 right-2 text-[9px] font-mono font-bold bg-black/80 backdrop-blur-sm text-cyber-rose border border-cyber-rose/30 px-2 py-0.5 rounded-full">
+                        REAL JUCE GUI
+                      </span>
+                    </Link>
                   </div>
                   <div className="flex items-center justify-between pt-3 border-t border-white/5 text-xs">
                     <span className="font-mono text-cyber-rose font-bold">$29 Perpetual</span>
