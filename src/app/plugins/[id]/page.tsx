@@ -42,7 +42,7 @@ export default function PluginDetailPage({ params }: { params: { id: string } })
               <span className="text-[10px] font-mono font-bold text-cyber-cyan bg-cyber-cyan/10 px-2 py-0.5 rounded border border-cyber-cyan/30">BEST VALUE</span>
             </div>
             <p className="text-xs text-slate-300 mt-0.5">
-              Unlock <strong>{plugin.name}</strong> plus all 14 other plugins for just <strong>$9.99/mo</strong>. Cancel anytime.
+              Unlock <strong>{plugin.name}</strong> plus all 14 other plugins for just <strong>$14.99/mo</strong>. Cancel anytime.
             </p>
           </div>
         </div>
@@ -50,7 +50,7 @@ export default function PluginDetailPage({ params }: { params: { id: string } })
           href="/pricing"
           className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-gradient-to-r from-cyber-cyan to-blue-600 hover:brightness-110 text-black font-black text-xs shadow-glow-cyan whitespace-nowrap transition-all flex items-center justify-center space-x-1.5"
         >
-          <span>Claim All-Access Pass ($9.99/mo)</span>
+          <span>Claim All-Access Pass ($14.99/mo)</span>
           <ArrowRight className="w-3.5 h-3.5" />
         </Link>
       </div>
@@ -124,7 +124,7 @@ export default function PluginDetailPage({ params }: { params: { id: string } })
                 className="w-full sm:w-auto px-5 py-3.5 rounded-xl bg-studio-900 border border-white/10 text-white text-xs font-bold hover:bg-studio-850 hover:border-white/20 transition-all flex items-center justify-center space-x-2"
               >
                 <Sparkles className="w-4 h-4 text-cyber-purple" />
-                <span>Or All-Access ($9.99/mo)</span>
+                <span>Or All-Access ($14.99/mo)</span>
               </Link>
             </div>
           </div>

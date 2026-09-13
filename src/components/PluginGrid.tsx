@@ -122,7 +122,7 @@ export const PluginGrid: React.FC = () => {
               <span className="text-[10px] font-mono text-emerald-400 font-bold bg-emerald-500/10 px-2.5 py-0.5 rounded-full border border-emerald-500/30">BEST VALUE • SAVE 80%</span>
             </div>
             <p className="text-xs sm:text-sm text-slate-300 mt-1">
-              Want the complete suite? Get <strong>all 15 plugins</strong> plus future instruments for only <strong>$9.99/mo</strong>, or purchase single perpetual lifetime licenses below.
+              Want the complete suite? Get <strong>all 15 plugins</strong> plus future instruments for only <strong>$14.99/mo</strong>, or purchase single perpetual lifetime licenses below.
             </p>
           </div>
         </div>
@@ -130,7 +130,7 @@ export const PluginGrid: React.FC = () => {
           href="/pricing"
           className="w-full md:w-auto px-6 py-3 rounded-xl bg-gradient-to-r from-cyber-cyan to-blue-600 hover:brightness-110 text-black font-black text-xs shadow-glow-cyan whitespace-nowrap transition-all flex items-center justify-center space-x-2 shrink-0"
         >
-          <span>Claim All-Access Pass ($9.99/mo)</span>
+          <span>Claim All-Access Pass ($14.99/mo)</span>
           <ArrowRight className="w-3.5 h-3.5" />
         </Link>
       </div>

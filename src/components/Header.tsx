@@ -60,7 +60,7 @@ export const Header: React.FC = () => {
             className="flex items-center space-x-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-cyber-cyan to-blue-600 text-black text-xs font-black shadow-glow-cyan hover:brightness-110 active:scale-95 transition-all"
           >
             <Sparkles className="w-4 h-4" />
-            <span>Get Pass • $9.99</span>
+            <span>Get Pass • $14.99</span>
           </Link>
         </div>
 

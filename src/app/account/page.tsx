@@ -292,7 +292,7 @@ export default function AccountPage() {
               href="/pricing"
               className="px-4 py-2 rounded-xl bg-cyber-purple/20 hover:bg-cyber-purple/30 text-cyber-purple border border-cyber-purple/40 text-xs font-bold transition-all text-center whitespace-nowrap"
             >
-              Or get all 15 for $9.99/mo &rarr;
+              Or get all 15 for $14.99/mo &rarr;
             </Link>
           </div>
         </div>

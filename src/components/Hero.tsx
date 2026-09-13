@@ -24,7 +24,7 @@ export const Hero: React.FC = () => {
               <span className="relative inline-flex rounded-full h-2 w-2 bg-cyber-cyan"></span>
             </span>
             <span className="font-extrabold text-white">FOUNDER&apos;S PASS:</span>
-            <span className="text-slate-300">Only <strong className="text-cyber-cyan">{FOUNDERS_SPOTS_REMAINING} of {FOUNDERS_SPOTS_TOTAL}</strong> spots left @ $9.99/mo</span>
+            <span className="text-slate-300">Only <strong className="text-cyber-cyan">{FOUNDERS_SPOTS_REMAINING} of {FOUNDERS_SPOTS_TOTAL}</strong> spots left @ $14.99/mo</span>
             <ArrowRight className="w-3.5 h-3.5 text-cyber-cyan group-hover:translate-x-0.5 transition-transform" />
           </Link>
         </div>

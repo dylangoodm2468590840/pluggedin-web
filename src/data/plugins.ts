@@ -380,6 +380,6 @@ export const DEMO_TRACKS: DemoTrack[] = [
 export const TOTAL_CATALOG_VALUE = 799;
 export const ALL_ACCESS_MONTHLY = 14.99;
 export const ALL_ACCESS_ANNUAL = 99;
-export const FOUNDERS_PROMO_MONTHLY = 9.99;
+export const FOUNDERS_PROMO_MONTHLY = 14.99;
 export const FOUNDERS_SPOTS_TOTAL = 250;
 export const FOUNDERS_SPOTS_REMAINING = 47;
