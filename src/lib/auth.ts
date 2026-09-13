@@ -33,53 +33,127 @@ export interface UserSafeProfile {
   createdAt: string;
 }
 
-// Store users database in a persistent server directory
-const DB_DIR = path.join(process.cwd(), 'data', 'db');
-const DB_FILE = path.join(DB_DIR, 'users.json');
+// Serverless & Vercel EROFS-safe persistent storage
+const LOCAL_DB_DIR = path.join(process.cwd(), 'data', 'db');
+const BUNDLED_SEED_FILE = path.join(LOCAL_DB_DIR, 'users.json');
+
+// In-memory cache to ensure user session integrity across serverless calls
+let memoryUsersCache: UserRecord[] | null = null;
+
+function getDbFile(): string {
+  // On Vercel / AWS Lambda, process.cwd() is read-only (/var/task). Use /tmp instead.
+  if (
+    process.env.VERCEL ||
+    process.env.AWS_LAMBDA_FUNCTION_NAME ||
+    process.cwd().startsWith('/var/task') ||
+    (process.platform === 'linux' && process.cwd().includes('/var/'))
+  ) {
+    return path.join('/tmp', 'pluggedin_users.json');
+  }
+  return BUNDLED_SEED_FILE;
+}
 
 function ensureDbExists(): void {
-  if (!fs.existsSync(DB_DIR)) {
-    fs.mkdirSync(DB_DIR, { recursive: true });
+  const targetFile = getDbFile();
+  const targetDir = path.dirname(targetFile);
+
+  try {
+    if (!fs.existsSync(targetDir)) {
+      fs.mkdirSync(targetDir, { recursive: true });
+    }
+  } catch (err) {
+    console.warn('Could not create directory:', targetDir, err);
   }
-  if (!fs.existsSync(DB_FILE)) {
-    // Initialize with a default admin/founder account
-    const defaultSalt = crypto.randomBytes(16).toString('hex');
-    const defaultHash = hashPassword('PluggedIn2026!', defaultSalt);
-    const initialUsers: UserRecord[] = [
-      {
-        id: 'usr_founder_001',
-        email: 'dylan@pluggedin.studio',
-        displayName: 'Dylan (Founder)',
-        passwordHash: defaultHash,
-        salt: defaultSalt,
-        tier: 'All-Access Studio Pass',
-        isLifetimeVIP: true,
-        subscriptionStatus: 'active',
-        ownedPlugins: ['ALL_15_PLUGINS'],
-        licenseKey: 'PLUG-VIP-9999-STUDIO',
-        authorizedMachines: ['DESKTOP-STUDIO-MAIN', 'MACBOOK-PRO-M3'],
-        createdAt: new Date().toISOString(),
-        lastLoginAt: new Date().toISOString(),
-      },
-    ];
-    fs.writeFileSync(DB_FILE, JSON.stringify(initialUsers, null, 2), 'utf-8');
+
+  if (!fs.existsSync(targetFile)) {
+    let initialUsers: UserRecord[] = [];
+
+    // Try reading bundled seed file if it exists
+    if (fs.existsSync(BUNDLED_SEED_FILE)) {
+      try {
+        const raw = fs.readFileSync(BUNDLED_SEED_FILE, 'utf-8');
+        initialUsers = JSON.parse(raw);
+      } catch (e) {
+        console.warn('Could not read bundled seed file:', e);
+      }
+    }
+
+    if (initialUsers.length === 0) {
+      const defaultSalt = crypto.randomBytes(16).toString('hex');
+      const defaultHash = hashPassword('PluggedIn2026!', defaultSalt);
+      initialUsers = [
+        {
+          id: 'usr_founder_001',
+          email: 'dylan@pluggedin.studio',
+          displayName: 'Dylan (Founder)',
+          passwordHash: defaultHash,
+          salt: defaultSalt,
+          tier: 'All-Access Studio Pass',
+          isLifetimeVIP: true,
+          subscriptionStatus: 'active',
+          ownedPlugins: ['ALL_15_PLUGINS'],
+          licenseKey: 'PLUG-VIP-9999-STUDIO',
+          authorizedMachines: ['DESKTOP-STUDIO-MAIN', 'MACBOOK-PRO-M3'],
+          createdAt: new Date().toISOString(),
+          lastLoginAt: new Date().toISOString(),
+        },
+      ];
+    }
+
+    try {
+      fs.writeFileSync(targetFile, JSON.stringify(initialUsers, null, 2), 'utf-8');
+    } catch (e) {
+      console.warn('Could not write seed file to target path, keeping in memory:', e);
+    }
   }
 }
 
 function readUsers(): UserRecord[] {
-  ensureDbExists();
-  try {
-    const raw = fs.readFileSync(DB_FILE, 'utf-8');
-    return JSON.parse(raw);
-  } catch (e) {
-    console.error('Failed to read users database:', e);
-    return [];
+  if (memoryUsersCache && memoryUsersCache.length > 0) {
+    return memoryUsersCache;
   }
+
+  const targetFile = getDbFile();
+  ensureDbExists();
+
+  try {
+    if (fs.existsSync(targetFile)) {
+      const raw = fs.readFileSync(targetFile, 'utf-8');
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        memoryUsersCache = parsed;
+        return parsed;
+      }
+    }
+  } catch (e) {
+    console.error('Failed to read target users database:', e);
+  }
+
+  // Fallback to bundled seed file if targetFile could not be read
+  try {
+    if (fs.existsSync(BUNDLED_SEED_FILE)) {
+      const raw = fs.readFileSync(BUNDLED_SEED_FILE, 'utf-8');
+      const parsed = JSON.parse(raw);
+      memoryUsersCache = parsed;
+      return parsed;
+    }
+  } catch (e) {
+    console.error('Failed to read bundled seed file:', e);
+  }
+
+  return memoryUsersCache || [];
 }
 
 function writeUsers(users: UserRecord[]): void {
-  ensureDbExists();
-  fs.writeFileSync(DB_FILE, JSON.stringify(users, null, 2), 'utf-8');
+  memoryUsersCache = users;
+  const targetFile = getDbFile();
+
+  try {
+    ensureDbExists();
+    fs.writeFileSync(targetFile, JSON.stringify(users, null, 2), 'utf-8');
+  } catch (e) {
+    console.warn('Filesystem write failed, users preserved safely in memory cache:', e);
+  }
 }
 
 function hashPassword(password: string, salt: string): string {
