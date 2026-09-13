@@ -108,44 +108,53 @@ function ensureDbExists(): void {
   }
 }
 
-const KV_URL = process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL || '';
-const KV_TOKEN = process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN || '';
+let redisClient: any = null;
+function getRedis(): any {
+  if (redisClient) return redisClient;
+  try {
+    if (
+      process.env.UPSTASH_REDIS_REST_URL ||
+      process.env.KV_REST_API_URL
+    ) {
+      const { Redis } = require('@upstash/redis');
+      redisClient = Redis.fromEnv();
+      return redisClient;
+    }
+  } catch (e) {
+    console.warn('Could not initialize Redis fromEnv:', e);
+  }
+  return null;
+}
 
 async function fetchCloudUsers(): Promise<UserRecord[] | null> {
-  if (!KV_URL || !KV_TOKEN) return null;
+  const redis = getRedis();
+  if (!redis) return null;
   try {
-    const res = await fetch(`${KV_URL}/get/pluggedin_users`, {
-      headers: { Authorization: `Bearer ${KV_TOKEN}` },
-      cache: 'no-store',
-    });
-    if (!res.ok) return null;
-    const data = await res.json();
-    if (data.result) {
-      const parsed = typeof data.result === 'string' ? JSON.parse(data.result) : data.result;
+    const data = await redis.get('pluggedin_users');
+    if (Array.isArray(data) && data.length > 0) {
+      memoryUsersCache = data;
+      return data;
+    }
+    if (typeof data === 'string') {
+      const parsed = JSON.parse(data);
       if (Array.isArray(parsed) && parsed.length > 0) {
         memoryUsersCache = parsed;
         return parsed;
       }
     }
   } catch (e) {
-    console.warn('Failed to fetch users from Cloud KV:', e);
+    console.warn('Upstash get error:', e);
   }
   return null;
 }
 
 async function saveCloudUsers(users: UserRecord[]): Promise<void> {
-  if (!KV_URL || !KV_TOKEN) return;
+  const redis = getRedis();
+  if (!redis) return;
   try {
-    await fetch(`${KV_URL}/set/pluggedin_users`, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${KV_TOKEN}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(users),
-    });
+    await redis.set('pluggedin_users', users);
   } catch (e) {
-    console.warn('Failed to save users to Cloud KV:', e);
+    console.warn('Upstash set error:', e);
   }
 }
 
