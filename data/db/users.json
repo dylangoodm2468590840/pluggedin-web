@@ -39,5 +39,24 @@
     "lastLoginAt": "2026-09-13T22:01:10.243Z",
     "resetToken": null,
     "resetTokenExpiry": null
+  },
+  {
+    "id": "usr_f6cc453bb4b5",
+    "email": "test_1789340553757@pluggedin.studio",
+    "displayName": "Test Producer",
+    "passwordHash": "e34be67496f2a4cfd66772084c32ffe43aed7c699fd87799266c4438cb70bf2da0b813c5986b1867cbd98d2b2fe914132f90d4ee80dee277c047d2b1b465f4c0",
+    "salt": "829fa42cce9e7692a308ee099ac00527",
+    "tier": "All-Access Studio Pass",
+    "isLifetimeVIP": false,
+    "subscriptionStatus": "active",
+    "ownedPlugins": [
+      "ALL_15_PLUGINS"
+    ],
+    "licenseKey": "PLUG-E0A0-AE6E-80D0",
+    "authorizedMachines": [
+      "PRIMARY-STUDIO-DEVICE"
+    ],
+    "createdAt": "2026-09-13T23:02:33.822Z",
+    "lastLoginAt": "2026-09-13T23:02:33.822Z"
   }
 ]

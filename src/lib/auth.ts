@@ -108,6 +108,47 @@ function ensureDbExists(): void {
   }
 }
 
+const KV_URL = process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL || '';
+const KV_TOKEN = process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN || '';
+
+async function fetchCloudUsers(): Promise<UserRecord[] | null> {
+  if (!KV_URL || !KV_TOKEN) return null;
+  try {
+    const res = await fetch(`${KV_URL}/get/pluggedin_users`, {
+      headers: { Authorization: `Bearer ${KV_TOKEN}` },
+      cache: 'no-store',
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    if (data.result) {
+      const parsed = typeof data.result === 'string' ? JSON.parse(data.result) : data.result;
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        memoryUsersCache = parsed;
+        return parsed;
+      }
+    }
+  } catch (e) {
+    console.warn('Failed to fetch users from Cloud KV:', e);
+  }
+  return null;
+}
+
+async function saveCloudUsers(users: UserRecord[]): Promise<void> {
+  if (!KV_URL || !KV_TOKEN) return;
+  try {
+    await fetch(`${KV_URL}/set/pluggedin_users`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${KV_TOKEN}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(users),
+    });
+  } catch (e) {
+    console.warn('Failed to save users to Cloud KV:', e);
+  }
+}
+
 function readUsers(): UserRecord[] {
   if (memoryUsersCache && memoryUsersCache.length > 0) {
     return memoryUsersCache;
@@ -184,12 +225,14 @@ export function toSafeProfile(user: UserRecord): UserSafeProfile {
 
 export async function findUserByEmail(email: string): Promise<UserRecord | null> {
   const normalized = email.trim().toLowerCase();
-  const users = readUsers();
+  const cloudUsers = await fetchCloudUsers();
+  const users = cloudUsers || readUsers();
   return users.find((u) => u.email.toLowerCase() === normalized) || null;
 }
 
 export async function findUserById(id: string): Promise<UserRecord | null> {
-  const users = readUsers();
+  const cloudUsers = await fetchCloudUsers();
+  const users = cloudUsers || readUsers();
   return users.find((u) => u.id === id) || null;
 }
 
@@ -199,7 +242,8 @@ export async function createUser(data: {
   displayName?: string;
 }): Promise<{ user: UserSafeProfile; token: string }> {
   const normalizedEmail = data.email.trim().toLowerCase();
-  const users = readUsers();
+  const cloudUsers = await fetchCloudUsers();
+  const users = cloudUsers || readUsers();
 
   if (users.some((u) => u.email.toLowerCase() === normalizedEmail)) {
     throw new Error('An account with this email already exists.');
@@ -227,6 +271,7 @@ export async function createUser(data: {
 
   users.push(newUser);
   writeUsers(users);
+  await saveCloudUsers(users);
 
   const token = createSessionToken(newUser.id, newUser.email);
   return { user: toSafeProfile(newUser), token };
@@ -237,7 +282,8 @@ export async function verifyUserLogin(
   pass: string
 ): Promise<{ user: UserSafeProfile; token: string }> {
   const normalizedEmail = email.trim().toLowerCase();
-  const users = readUsers();
+  const cloudUsers = await fetchCloudUsers();
+  const users = cloudUsers || readUsers();
   const user = users.find((u) => u.email.toLowerCase() === normalizedEmail);
 
   if (!user) {
@@ -251,6 +297,7 @@ export async function verifyUserLogin(
 
   user.lastLoginAt = new Date().toISOString();
   writeUsers(users);
+  await saveCloudUsers(users);
 
   const token = createSessionToken(user.id, user.email);
   return { user: toSafeProfile(user), token };
@@ -258,7 +305,8 @@ export async function verifyUserLogin(
 
 export async function createPasswordResetToken(email: string): Promise<{ token: string; email: string }> {
   const normalizedEmail = email.trim().toLowerCase();
-  const users = readUsers();
+  const cloudUsers = await fetchCloudUsers();
+  const users = cloudUsers || readUsers();
   const user = users.find((u) => u.email.toLowerCase() === normalizedEmail);
 
   if (!user) {
@@ -271,6 +319,7 @@ export async function createPasswordResetToken(email: string): Promise<{ token: 
   user.resetToken = resetToken;
   user.resetTokenExpiry = expiry;
   writeUsers(users);
+  await saveCloudUsers(users);
 
   return { token: resetToken, email: user.email };
 }
@@ -283,7 +332,8 @@ export async function resetPasswordWithToken(
     throw new Error('Password must be at least 6 characters.');
   }
 
-  const users = readUsers();
+  const cloudUsers = await fetchCloudUsers();
+  const users = cloudUsers || readUsers();
   const user = users.find(
     (u) => u.resetToken === token && u.resetTokenExpiry && u.resetTokenExpiry > Date.now()
   );
@@ -298,6 +348,7 @@ export async function resetPasswordWithToken(
   user.resetToken = null;
   user.resetTokenExpiry = null;
   writeUsers(users);
+  await saveCloudUsers(users);
 
   return { success: true, message: 'Password has been successfully reset! You can now sign in.' };
 }
@@ -337,7 +388,8 @@ export async function grantUserAccess(
     isLifetime?: boolean;
   }
 ): Promise<UserSafeProfile> {
-  const users = readUsers();
+  const cloudUsers = await fetchCloudUsers();
+  const users = cloudUsers || readUsers();
   const user = users.find((u) => u.id === userId);
   if (!user) {
     throw new Error('User not found');
@@ -362,6 +414,8 @@ export async function grantUserAccess(
   }
 
   writeUsers(users);
+  await saveCloudUsers(users);
   return toSafeProfile(user);
 }
+
 
