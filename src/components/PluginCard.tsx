@@ -75,9 +75,20 @@ export const PluginCard: React.FC<PluginCardProps> = ({ plugin }) => {
             className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-500"
             loading="lazy"
             onError={(e) => {
+              const target = e.currentTarget;
+              if (plugin.id === 'UNDERGRND' || plugin.shortName.toLowerCase() === 'underground') {
+                if (!target.src.includes('underground.png')) {
+                  target.src = '/images/plugins/underground.png';
+                  return;
+                }
+                if (!target.src.includes('undergrnd.png')) {
+                  target.src = '/images/plugins/undergrnd.png';
+                  return;
+                }
+              }
               const fallback = `/images/plugins/${plugin.shortName.toLowerCase().replace(/\s+/g, '')}.png`;
-              if (e.currentTarget.src !== fallback) {
-                e.currentTarget.src = fallback;
+              if (target.src !== fallback) {
+                target.src = fallback;
               }
             }}
           />

@@ -4,8 +4,11 @@ export const getPluginImageUrl = (id: string): string => {
   const map: Record<string, string> = {
     PlugChop: '/images/plugins/plugchop.png',
     PLUGTNE: '/images/plugins/plugtne.png',
-    UNDERGRND: '/images/plugins/undergrnd.png',
+    UNDERGRND: '/images/plugins/underground.png',
+    underground: '/images/plugins/underground.png',
+    undergrnd: '/images/plugins/underground.png',
     pluggedin_plugged1: '/images/plugins/pluggedin_plugged1.png',
+    plugged1: '/images/plugins/pluggedin_plugged1.png',
     pluggedin_plugvox: '/images/plugins/pluggedin_plugvox.png',
     pluggedin_plugopto: '/images/plugins/pluggedin_plugopto.png',
     pluggedin_plugglue: '/images/plugins/pluggedin_plugglue.png',
