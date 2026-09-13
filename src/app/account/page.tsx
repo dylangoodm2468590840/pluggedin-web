@@ -20,6 +20,15 @@ import {
   RefreshCw,
 } from 'lucide-react';
 
+interface MachineItem {
+  machineId: string;
+  hostname: string;
+  platform: string;
+  osVersion?: string;
+  activatedAt: string;
+  lastSeenAt: string;
+}
+
 interface UserProfile {
   id: string;
   email: string;
@@ -29,7 +38,10 @@ interface UserProfile {
   subscriptionStatus: string;
   ownedPlugins: string[];
   licenseKey: string;
-  authorizedMachines: string[];
+  authorizedMachines?: string[];
+  machines?: MachineItem[];
+  maxDevices?: number;
+  activeDeviceCount?: number;
   createdAt: string;
 }
 
@@ -45,12 +57,14 @@ export default function AccountPage() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [resetToken, setResetToken] = useState('');
 
-  // Status banners
+  // Status banners & device actions
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [copiedKey, setCopiedKey] = useState(false);
   const [pendingBuyItem, setPendingBuyItem] = useState<{ id: string; name: string; price: string } | null>(null);
+  const [deactivatingMachine, setDeactivatingMachine] = useState<string | null>(null);
+  const [deviceActionMessage, setDeviceActionMessage] = useState<string | null>(null);
 
   // Check existing session from server or URL params on mount
   useEffect(() => {
@@ -254,6 +268,30 @@ export default function AccountPage() {
     }
   };
 
+  const handleDeactivateMachine = async (machineId: string) => {
+    setDeactivatingMachine(machineId);
+    setDeviceActionMessage(null);
+    try {
+      const res = await fetch('/api/devices/deactivate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ machineId }),
+      });
+      const data = await res.json();
+      if (data.success && data.user) {
+        setCurrentUser(data.user);
+        localStorage.setItem('pluggedin_web_user', JSON.stringify(data.user));
+        setDeviceActionMessage(`Machine successfully deactivated! Slot is now open.`);
+      } else {
+        setDeviceActionMessage(data.error || 'Failed to deactivate machine.');
+      }
+    } catch {
+      setDeviceActionMessage('Network error while deactivating machine.');
+    } finally {
+      setDeactivatingMachine(null);
+    }
+  };
+
   return (
     <div className="py-16 max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 min-h-[75vh]">
       <div className="text-center max-w-xl mx-auto mb-10 space-y-2">
@@ -328,8 +366,11 @@ export default function AccountPage() {
                   </span>
                   <span>•</span>
                   <span className="flex items-center space-x-1">
-                    <Laptop className="w-3.5 h-3.5" />
-                    <span>{currentUser.authorizedMachines?.length || 1} of 3 Studio Devices</span>
+                    <Laptop className="w-3.5 h-3.5 text-cyber-cyan" />
+                    <span>
+                      {currentUser.machines?.length || currentUser.authorizedMachines?.length || 0} of{' '}
+                      {currentUser.maxDevices || (currentUser.isLifetimeVIP ? 5 : 3)} Studio Computers
+                    </span>
                   </span>
                 </div>
               </div>
@@ -381,6 +422,100 @@ export default function AccountPage() {
                 <Download className="w-3.5 h-3.5" />
                 <span>Download Desktop Central</span>
               </Link>
+            </div>
+          </div>
+
+          {/* Authorized Computers & DAW Activations */}
+          <div className="glass-panel rounded-3xl p-6 sm:p-8 border border-white/10 space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <div className="flex items-center space-x-2">
+                  <span className="text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                    MACHINE ACTIVATIONS
+                  </span>
+                  <span className="text-[11px] font-bold text-slate-400">
+                    Waves &amp; Slate-Style Hardware Lock
+                  </span>
+                </div>
+                <h3 className="text-lg font-black text-white mt-2">Authorized Computers &amp; DAW Rigs</h3>
+                <p className="text-xs text-slate-400">
+                  Each machine activation allows running all plugins in any DAW (FL Studio, Ableton, Logic, Pro Tools).
+                </p>
+              </div>
+
+              <div className="flex items-center space-x-2">
+                <div className="px-4 py-2 rounded-2xl bg-studio-950 border border-white/10 flex items-center space-x-2">
+                  <Laptop className="w-4 h-4 text-cyber-cyan" />
+                  <span className="text-xs font-black text-white">
+                    {currentUser.machines?.length || currentUser.authorizedMachines?.length || 0} of{' '}
+                    {currentUser.maxDevices || (currentUser.isLifetimeVIP ? 5 : 3)} Computers Active
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {deviceActionMessage && (
+              <div className="p-3.5 rounded-xl bg-cyber-cyan/10 border border-cyber-cyan/30 text-xs text-cyber-cyan flex items-center space-x-2">
+                <CheckCircle2 className="w-4 h-4 shrink-0" />
+                <span>{deviceActionMessage}</span>
+              </div>
+            )}
+
+            {/* List of Machines */}
+            <div className="space-y-3">
+              {currentUser.machines && currentUser.machines.length > 0 ? (
+                currentUser.machines.map((mach) => (
+                  <div
+                    key={mach.machineId}
+                    className="p-4 rounded-2xl bg-studio-950/70 border border-white/5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:border-white/10 transition-all"
+                  >
+                    <div className="flex items-center space-x-3.5">
+                      <div className="w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-slate-300 shrink-0">
+                        <Laptop className="w-5 h-5 text-cyber-cyan" />
+                      </div>
+                      <div>
+                        <div className="flex items-center space-x-2">
+                          <h4 className="text-sm font-black text-white">{mach.hostname || mach.machineId}</h4>
+                          <span className="text-[9px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                            Authorized
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-slate-400 mt-0.5">
+                          {mach.platform === 'win32'
+                            ? 'Windows PC'
+                            : mach.platform === 'darwin'
+                            ? 'macOS'
+                            : mach.platform}
+                          {mach.osVersion ? ` • ${mach.osVersion}` : ''}
+                          {mach.activatedAt
+                            ? ` • Activated ${new Date(mach.activatedAt).toLocaleDateString()}`
+                            : ''}
+                        </p>
+                      </div>
+                    </div>
+
+                    <button
+                      onClick={() => handleDeactivateMachine(mach.machineId)}
+                      disabled={deactivatingMachine === mach.machineId}
+                      className="px-3.5 py-1.5 rounded-xl border border-rose-500/30 text-rose-400 hover:bg-rose-500/10 text-xs font-bold transition-all self-start sm:self-auto disabled:opacity-50"
+                    >
+                      {deactivatingMachine === mach.machineId ? 'Deactivating...' : 'Deactivate'}
+                    </button>
+                  </div>
+                ))
+              ) : (
+                <div className="p-8 rounded-2xl bg-studio-950/40 border border-dashed border-white/10 text-center space-y-2">
+                  <Laptop className="w-8 h-8 text-slate-600 mx-auto" />
+                  <h4 className="text-xs font-bold text-slate-300">No computers currently active</h4>
+                  <p className="text-[11px] text-slate-500 max-w-sm mx-auto">
+                    Open <strong>PluggedIN Central</strong> on your computer and sign in with this account to automatically activate your DAW machine.
+                  </p>
+                </div>
+              )}
+            </div>
+
+            <div className="p-3.5 rounded-2xl bg-white/[0.02] border border-white/5 text-[11px] text-slate-400">
+              Swapping laptops or building a new studio PC? Simply click <strong>Deactivate</strong> on an old computer anytime to free up an activation slot.
             </div>
           </div>
         </div>

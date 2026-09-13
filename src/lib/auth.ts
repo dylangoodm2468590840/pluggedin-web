@@ -2,6 +2,15 @@ import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
 
+export interface MachineActivation {
+  machineId: string;
+  hostname: string;
+  platform: string;
+  osVersion?: string;
+  activatedAt: string;
+  lastSeenAt: string;
+}
+
 export interface UserRecord {
   id: string;
   email: string;
@@ -14,6 +23,8 @@ export interface UserRecord {
   ownedPlugins: string[];
   licenseKey: string;
   authorizedMachines: string[];
+  machines?: MachineActivation[];
+  maxDevices?: number;
   createdAt: string;
   lastLoginAt: string;
   resetToken?: string | null;
@@ -30,6 +41,9 @@ export interface UserSafeProfile {
   ownedPlugins: string[];
   licenseKey: string;
   authorizedMachines: string[];
+  machines: MachineActivation[];
+  maxDevices: number;
+  activeDeviceCount: number;
   createdAt: string;
 }
 
@@ -218,6 +232,21 @@ function generateLicenseKey(): string {
 }
 
 export function toSafeProfile(user: UserRecord): UserSafeProfile {
+  let machines: MachineActivation[] = [];
+  if (Array.isArray(user.machines)) {
+    machines = user.machines;
+  } else if (Array.isArray(user.authorizedMachines) && user.authorizedMachines.length > 0) {
+    machines = user.authorizedMachines.map((m) => ({
+      machineId: m.toLowerCase().replace(/[^a-z0-9]/g, '-'),
+      hostname: m,
+      platform: 'win32',
+      activatedAt: user.createdAt,
+      lastSeenAt: user.lastLoginAt,
+    }));
+  }
+
+  const maxDevices = user.maxDevices || (user.isLifetimeVIP ? 5 : 3);
+
   return {
     id: user.id,
     email: user.email,
@@ -227,7 +256,10 @@ export function toSafeProfile(user: UserRecord): UserSafeProfile {
     subscriptionStatus: user.subscriptionStatus,
     ownedPlugins: user.ownedPlugins,
     licenseKey: user.licenseKey,
-    authorizedMachines: user.authorizedMachines,
+    authorizedMachines: machines.map((m) => m.hostname || m.machineId),
+    machines,
+    maxDevices,
+    activeDeviceCount: machines.length,
     createdAt: user.createdAt,
   };
 }
@@ -395,6 +427,7 @@ export async function grantUserAccess(
     tier?: 'All-Access Studio Pass' | 'Founder Member' | 'Standard Member';
     pluginId?: string;
     isLifetime?: boolean;
+    maxDevices?: number;
   }
 ): Promise<UserSafeProfile> {
   const cloudUsers = await fetchCloudUsers();
@@ -420,11 +453,187 @@ export async function grantUserAccess(
 
   if (grant.isLifetime) {
     user.isLifetimeVIP = true;
+    user.subscriptionStatus = 'active';
+    user.maxDevices = grant.maxDevices || 5;
+    if (!user.ownedPlugins.includes('ALL_15_PLUGINS')) {
+      user.ownedPlugins.push('ALL_15_PLUGINS');
+    }
+  }
+
+  if (grant.maxDevices) {
+    user.maxDevices = grant.maxDevices;
   }
 
   writeUsers(users);
   await saveCloudUsers(users);
   return toSafeProfile(user);
+}
+
+const LICENSE_SECRET = 'pluggedin_machine_license_signature_key_2026_dylan';
+
+export function generateMachineLicenseSignature(payload: {
+  userId: string;
+  email: string;
+  licenseKey: string;
+  machineId: string;
+  tier: string;
+  isLifetimeVIP: boolean;
+  issuedAt: string;
+}): string {
+  const data = `${payload.userId}:${payload.email}:${payload.licenseKey}:${payload.machineId}:${payload.tier}:${payload.isLifetimeVIP}:${payload.issuedAt}`;
+  return crypto.createHmac('sha256', LICENSE_SECRET).update(data).digest('hex');
+}
+
+export async function activateUserMachine(
+  userId: string,
+  machineInfo: {
+    machineId: string;
+    hostname: string;
+    platform: string;
+    osVersion?: string;
+  }
+): Promise<{
+  success: boolean;
+  user: UserSafeProfile | null;
+  machineCount: number;
+  maxDevices: number;
+  licensePayload?: any;
+  error?: string;
+}> {
+  const cloudUsers = await fetchCloudUsers();
+  const users = cloudUsers || readUsers();
+  const user = users.find((u) => u.id === userId);
+
+  if (!user) {
+    return { success: false, user: null, machineCount: 0, maxDevices: 0, error: 'User account not found' };
+  }
+
+  // Check subscription / pass status
+  const hasAccess = user.isLifetimeVIP || user.subscriptionStatus === 'active';
+  if (!hasAccess) {
+    return {
+      success: false,
+      user: toSafeProfile(user),
+      machineCount: 0,
+      maxDevices: user.maxDevices || 3,
+      error: 'No active All-Access Studio Pass found. Please subscribe or redeem a VIP code.',
+    };
+  }
+
+  if (!user.machines) {
+    user.machines = [];
+  }
+
+  const maxDevices = user.maxDevices || (user.isLifetimeVIP ? 5 : 3);
+  const now = new Date().toISOString();
+  const cleanId = (machineInfo.machineId || machineInfo.hostname).trim();
+  const cleanHostname = (machineInfo.hostname || machineInfo.machineId || 'Studio Rig').trim();
+
+  // Find existing machine
+  const existingIdx = user.machines.findIndex(
+    (m) =>
+      m.machineId.toLowerCase() === cleanId.toLowerCase() ||
+      m.hostname.toLowerCase() === cleanHostname.toLowerCase()
+  );
+
+  if (existingIdx >= 0) {
+    // Already registered, update lastSeenAt
+    user.machines[existingIdx].lastSeenAt = now;
+    if (machineInfo.osVersion) user.machines[existingIdx].osVersion = machineInfo.osVersion;
+    if (machineInfo.platform) user.machines[existingIdx].platform = machineInfo.platform;
+  } else {
+    // New machine registration: check limits
+    if (user.machines.length >= maxDevices) {
+      return {
+        success: false,
+        user: toSafeProfile(user),
+        machineCount: user.machines.length,
+        maxDevices,
+        error: `Device limit reached (${user.machines.length} of ${maxDevices} computers activated). Please deactivate an old machine from your account dashboard to activate this device.`,
+      };
+    }
+
+    user.machines.push({
+      machineId: cleanId,
+      hostname: cleanHostname,
+      platform: machineInfo.platform || 'win32',
+      osVersion: machineInfo.osVersion,
+      activatedAt: now,
+      lastSeenAt: now,
+    });
+  }
+
+  user.authorizedMachines = user.machines.map((m) => m.hostname);
+  writeUsers(users);
+  await saveCloudUsers(users);
+
+  const issuedAt = now;
+  const signature = generateMachineLicenseSignature({
+    userId: user.id,
+    email: user.email,
+    licenseKey: user.licenseKey,
+    machineId: cleanId,
+    tier: user.tier,
+    isLifetimeVIP: user.isLifetimeVIP,
+    issuedAt,
+  });
+
+  const licensePayload = {
+    schemaVersion: '1.0',
+    userId: user.id,
+    email: user.email,
+    displayName: user.displayName,
+    licenseKey: user.licenseKey,
+    tier: user.tier,
+    isLifetimeVIP: user.isLifetimeVIP,
+    machineId: cleanId,
+    hostname: cleanHostname,
+    issuedAt,
+    signature,
+  };
+
+  const safe = toSafeProfile(user);
+  return {
+    success: true,
+    user: safe,
+    machineCount: safe.machines.length,
+    maxDevices,
+    licensePayload,
+  };
+}
+
+export async function deactivateUserMachine(
+  userId: string,
+  machineIdOrHostname: string
+): Promise<{ success: boolean; user: UserSafeProfile; machineCount: number; maxDevices: number }> {
+  const cloudUsers = await fetchCloudUsers();
+  const users = cloudUsers || readUsers();
+  const user = users.find((u) => u.id === userId);
+
+  if (!user) {
+    throw new Error('User not found');
+  }
+
+  if (!user.machines) {
+    user.machines = [];
+  }
+
+  const query = machineIdOrHostname.trim().toLowerCase();
+  user.machines = user.machines.filter(
+    (m) => m.machineId.toLowerCase() !== query && m.hostname.toLowerCase() !== query
+  );
+  user.authorizedMachines = user.machines.map((m) => m.hostname);
+
+  writeUsers(users);
+  await saveCloudUsers(users);
+
+  const safe = toSafeProfile(user);
+  return {
+    success: true,
+    user: safe,
+    machineCount: safe.machines.length,
+    maxDevices: safe.maxDevices,
+  };
 }
 
 

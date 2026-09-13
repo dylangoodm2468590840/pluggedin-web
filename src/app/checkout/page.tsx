@@ -126,43 +126,33 @@ export default function CheckoutPage() {
     setSubmitting(true);
 
     try {
-      if (!currentUser) {
-        if (!email || !password) {
-          setCheckoutError('Please enter your email and choose a password for your account.');
-          setSubmitting(false);
-          return;
-        }
-
-        const regRes = await fetch('/api/auth/register', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            email: email.trim(),
-            password,
-            displayName: displayName.trim() || undefined,
-          }),
-        });
-        const regData = await regRes.json();
-
-        if (!regRes.ok || !regData.success) {
-          const loginRes = await fetch('/api/auth/login', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email: email.trim(), password }),
-          });
-          const loginData = await loginRes.json();
-
-          if (!loginRes.ok || !loginData.success) {
-            setCheckoutError(regData.error || 'Failed to authenticate account.');
-            setSubmitting(false);
-            return;
-          }
-          setCurrentUser(loginData.user);
-        } else {
-          setCurrentUser(regData.user);
-        }
+      if (!currentUser && (!email || !password)) {
+        setCheckoutError('Please enter your email and choose a password for your account.');
+        setSubmitting(false);
+        return;
       }
 
+      const claimRes = await fetch('/api/promo/claim', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          code: appliedPromo?.code || promoCode.trim(),
+          email: email.trim(),
+          password,
+          displayName: displayName.trim() || undefined,
+          pluginId,
+        }),
+      });
+
+      const claimData = await claimRes.json();
+
+      if (!claimRes.ok || !claimData.success) {
+        setCheckoutError(claimData.error || 'Failed to claim VIP promo pass.');
+        setSubmitting(false);
+        return;
+      }
+
+      setCurrentUser(claimData.user);
       setCheckoutSuccess(true);
       setTimeout(() => {
         router.push('/account?checkout=success');

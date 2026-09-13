@@ -58,5 +58,24 @@
     ],
     "createdAt": "2026-09-13T23:02:33.822Z",
     "lastLoginAt": "2026-09-13T23:02:33.822Z"
+  },
+  {
+    "id": "usr_56eebb605915",
+    "email": "testfriend@pluggedin.studio",
+    "displayName": "Homie Test",
+    "passwordHash": "1af292f94242e0a9ebfe399213987e33ec95545bb89f10faabae8041d30fad37fcf13e3fbdd70aeed107c698072c8012a4a0d237c7b011d961ab1ff6968d0bca",
+    "salt": "49d7d98082e787572ed1ebcb08ca1f9e",
+    "tier": "All-Access Studio Pass",
+    "isLifetimeVIP": true,
+    "subscriptionStatus": "active",
+    "ownedPlugins": [
+      "ALL_15_PLUGINS"
+    ],
+    "licenseKey": "PLUG-BD42-84F1-3043",
+    "authorizedMachines": [],
+    "createdAt": "2026-09-13T23:37:34.984Z",
+    "lastLoginAt": "2026-09-13T23:37:39.774Z",
+    "maxDevices": 5,
+    "machines": []
   }
 ]
