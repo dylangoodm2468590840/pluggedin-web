@@ -54,20 +54,28 @@ export default function AccountPage() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [copiedKey, setCopiedKey] = useState(false);
+  const [pendingBuyItem, setPendingBuyItem] = useState<{ id: string; name: string; price: string } | null>(null);
 
   // Check existing session from server or URL params on mount
   useEffect(() => {
-    // Check URL parameters for reset token
+    // Check URL parameters for reset token or buy intent
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search);
       const mode = params.get('mode');
       const token = params.get('token');
       const paramEmail = params.get('email');
+      const buyId = params.get('buy');
+      const buyName = params.get('name');
+      const buyPrice = params.get('price');
 
       if (mode === 'reset' && token) {
         setAuthMode('reset');
         setResetToken(token);
         if (paramEmail) setEmail(paramEmail);
+      }
+
+      if (buyId && buyPrice) {
+        setPendingBuyItem({ id: buyId, name: buyName || buyId, price: buyPrice });
       }
     }
 
@@ -298,6 +306,39 @@ export default function AccountPage() {
           Permanent cloud credentials for PluggedIN Central, software activations, and All-Access passes.
         </p>
       </div>
+
+      {/* Pending Plugin Purchase Notice */}
+      {pendingBuyItem && (
+        <div className="mb-8 p-5 rounded-3xl bg-gradient-to-r from-emerald-500/20 via-studio-900 to-cyber-cyan/20 border border-emerald-500/40 shadow-glow-cyan">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div className="flex items-center space-x-3.5">
+              <div className="w-10 h-10 rounded-2xl bg-emerald-500 text-black flex items-center justify-center font-black text-lg shrink-0">
+                $
+              </div>
+              <div>
+                <span className="text-[10px] font-black uppercase text-emerald-400 tracking-wider">
+                  PERPETUAL LIFETIME LICENSE CHECKOUT
+                </span>
+                <h3 className="text-base font-black text-white">
+                  {pendingBuyItem.name} — ${pendingBuyItem.price} Launch Price
+                </h3>
+                <p className="text-xs text-slate-300">
+                  {currentUser
+                    ? 'Your license key below activates this plugin on up to 3 studio machines.'
+                    : 'Sign in or create your free account below to receive your permanent license key.'}
+                </p>
+              </div>
+            </div>
+
+            <Link
+              href="/pricing"
+              className="px-4 py-2 rounded-xl bg-cyber-purple/20 hover:bg-cyber-purple/30 text-cyber-purple border border-cyber-purple/40 text-xs font-bold transition-all text-center whitespace-nowrap"
+            >
+              Or get all 15 for $9.99/mo &rarr;
+            </Link>
+          </div>
+        </div>
+      )}
 
       {currentUser ? (
         /* LOGGED IN MEMBER DASHBOARD */

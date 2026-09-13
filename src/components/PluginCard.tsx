@@ -144,10 +144,10 @@ export const PluginCard: React.FC<PluginCardProps> = ({ plugin }) => {
           </Link>
 
           <Link
-            href="/pricing"
+            href={`/account?buy=${plugin.id}&name=${encodeURIComponent(plugin.name)}&price=${plugin.salePrice}`}
             className="w-full py-2.5 rounded-xl bg-gradient-to-r from-cyber-cyan to-blue-600 text-black text-xs font-black shadow-glow-cyan hover:brightness-110 active:scale-95 transition-all flex items-center justify-center space-x-1"
           >
-            <span>Get Pass</span>
+            <span>Buy ${plugin.salePrice}</span>
           </Link>
         </div>
       </div>

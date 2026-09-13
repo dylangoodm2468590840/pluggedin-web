@@ -1,9 +1,8 @@
 import React from 'react';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { Sparkles, Check, ArrowLeft, Download, ShieldCheck, Cpu, Layers, CheckCircle2, Zap, MonitorCheck } from 'lucide-react';
+import { Sparkles, Check, ArrowLeft, Download, ShieldCheck, Cpu, Layers, CheckCircle2, Zap, MonitorCheck, ArrowRight } from 'lucide-react';
 import { PLUGINS_DATA, getPluginImageUrl } from '../../../data/plugins';
-import { PluginMiniPlayer } from '../../../components/PluginMiniPlayer';
 
 export function generateStaticParams() {
   return PLUGINS_DATA.map((plugin) => ({
@@ -29,10 +28,37 @@ export default function PluginDetailPage({ params }: { params: { id: string } })
 
   return (
     <div className="py-16 max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+      {/* Top All-Access Pass Promo Banner */}
+      <div className="mb-8 p-4 sm:p-5 rounded-3xl bg-gradient-to-r from-cyber-purple/20 via-studio-900 to-cyber-cyan/20 border border-cyber-cyan/30 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-glow-cyan">
+        <div className="flex items-center space-x-3.5">
+          <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-cyber-cyan to-cyber-purple p-0.5 shadow-glow-cyan shrink-0 flex items-center justify-center">
+            <div className="w-full h-full bg-studio-950 rounded-[14px] flex items-center justify-center">
+              <Sparkles className="w-5 h-5 text-cyber-cyan" />
+            </div>
+          </div>
+          <div>
+            <div className="flex items-center space-x-2">
+              <span className="text-xs font-black uppercase text-white tracking-wide">ALL-ACCESS STUDIO PASS</span>
+              <span className="text-[10px] font-mono font-bold text-cyber-cyan bg-cyber-cyan/10 px-2 py-0.5 rounded border border-cyber-cyan/30">BEST VALUE</span>
+            </div>
+            <p className="text-xs text-slate-300 mt-0.5">
+              Unlock <strong>{plugin.name}</strong> plus all 14 other plugins for just <strong>$9.99/mo</strong>. Cancel anytime.
+            </p>
+          </div>
+        </div>
+        <Link
+          href="/pricing"
+          className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-gradient-to-r from-cyber-cyan to-blue-600 hover:brightness-110 text-black font-black text-xs shadow-glow-cyan whitespace-nowrap transition-all flex items-center justify-center space-x-1.5"
+        >
+          <span>Claim All-Access Pass ($9.99/mo)</span>
+          <ArrowRight className="w-3.5 h-3.5" />
+        </Link>
+      </div>
+
       {/* Back Link */}
       <Link
         href="/#plugins"
-        className="inline-flex items-center space-x-2 text-xs font-bold text-slate-400 hover:text-white transition-colors mb-8"
+        className="inline-flex items-center space-x-2 text-xs font-bold text-slate-400 hover:text-white transition-colors mb-6"
       >
         <ArrowLeft className="w-4 h-4" />
         <span>Back to Plugin Catalog</span>
@@ -48,7 +74,9 @@ export default function PluginDetailPage({ params }: { params: { id: string } })
             <div className="flex items-center space-x-2 font-mono text-xs text-slate-400">
               <span>v{plugin.latestVersion}</span>
               <span>•</span>
-              <span className="text-cyber-cyan">{plugin.devBuild}</span>
+              <span className="text-emerald-400 font-bold bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/30 text-[10px]">
+                OFFICIAL RELEASE
+              </span>
             </div>
           </div>
 
@@ -76,21 +104,27 @@ export default function PluginDetailPage({ params }: { params: { id: string } })
                   ${plugin.retailPrice}
                 </span>
                 <span className="text-xs font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
-                  Save {Math.round(((plugin.retailPrice - plugin.salePrice) / plugin.retailPrice) * 100)}%
+                  Launch Sale -{Math.round(((plugin.retailPrice - plugin.salePrice) / plugin.retailPrice) * 100)}%
                 </span>
               </div>
               <span className="text-xs text-slate-400 block mt-1">
-                One-time purchase • Lifetime updates • 3 machine authorizations
+                One-time purchase • Perpetual lifetime license • 3 machine authorizations
               </span>
             </div>
 
             <div className="flex flex-col sm:flex-row items-center gap-3 w-full sm:w-auto">
               <Link
-                href="/pricing"
+                href={`/account?buy=${plugin.id}&name=${encodeURIComponent(plugin.name)}&price=${plugin.salePrice}`}
                 className="w-full sm:w-auto px-6 py-3.5 rounded-xl bg-gradient-to-r from-cyber-cyan to-blue-600 text-black text-xs font-black shadow-glow-cyan hover:brightness-110 active:scale-95 transition-all flex items-center justify-center space-x-2"
               >
-                <Sparkles className="w-4 h-4" />
-                <span>Get with All-Access Pass ($14.99/mo)</span>
+                <span>Buy Lifetime License • ${plugin.salePrice}</span>
+              </Link>
+              <Link
+                href="/pricing"
+                className="w-full sm:w-auto px-5 py-3.5 rounded-xl bg-studio-900 border border-white/10 text-white text-xs font-bold hover:bg-studio-850 hover:border-white/20 transition-all flex items-center justify-center space-x-2"
+              >
+                <Sparkles className="w-4 h-4 text-cyber-purple" />
+                <span>Or All-Access ($9.99/mo)</span>
               </Link>
             </div>
           </div>
@@ -119,9 +153,6 @@ export default function PluginDetailPage({ params }: { params: { id: string } })
           />
         </div>
       </div>
-
-      {/* Live Audio Audition Mini-Player (If Demo Exists) */}
-      <PluginMiniPlayer pluginId={plugin.id} />
 
       {/* Feature Breakdown & Specifications */}
       <div className="mt-12 grid grid-cols-1 md:grid-cols-2 gap-8">

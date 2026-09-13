@@ -1,7 +1,8 @@
 'use client';
 
 import React, { useState, useMemo } from 'react';
-import { Search, SlidersHorizontal, Sparkles, Music, Mic, Radio, Waves, Cpu, Disc3 } from 'lucide-react';
+import Link from 'next/link';
+import { Search, SlidersHorizontal, Sparkles, Music, Mic, Radio, Waves, Cpu, Disc3, ArrowRight } from 'lucide-react';
 import { PLUGINS_DATA } from '../data/plugins';
 import { PluginCard } from './PluginCard';
 
@@ -105,6 +106,33 @@ export const PluginGrid: React.FC = () => {
             className="w-full pl-10 pr-4 py-3 rounded-xl bg-studio-900 border border-white/10 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyber-cyan/60 transition-all shadow-inner"
           />
         </div>
+      </div>
+
+      {/* All-Access Pass Top Promo Banner */}
+      <div className="mb-10 p-5 sm:p-6 rounded-3xl bg-gradient-to-r from-cyber-purple/20 via-studio-900 to-cyber-cyan/20 border border-cyber-cyan/30 flex flex-col md:flex-row items-center justify-between gap-6 shadow-glow-cyan">
+        <div className="flex items-center space-x-4">
+          <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-cyber-cyan to-cyber-purple p-0.5 shadow-glow-cyan shrink-0 flex items-center justify-center">
+            <div className="w-full h-full bg-studio-950 rounded-[14px] flex items-center justify-center">
+              <Sparkles className="w-6 h-6 text-cyber-cyan" />
+            </div>
+          </div>
+          <div>
+            <div className="flex items-center space-x-2">
+              <span className="text-sm font-black uppercase text-white tracking-wide">ALL-ACCESS STUDIO PASS</span>
+              <span className="text-[10px] font-mono text-emerald-400 font-bold bg-emerald-500/10 px-2.5 py-0.5 rounded-full border border-emerald-500/30">BEST VALUE • SAVE 80%</span>
+            </div>
+            <p className="text-xs sm:text-sm text-slate-300 mt-1">
+              Want the complete suite? Get <strong>all 15 plugins</strong> plus future instruments for only <strong>$9.99/mo</strong>, or purchase single perpetual lifetime licenses below.
+            </p>
+          </div>
+        </div>
+        <Link
+          href="/pricing"
+          className="w-full md:w-auto px-6 py-3 rounded-xl bg-gradient-to-r from-cyber-cyan to-blue-600 hover:brightness-110 text-black font-black text-xs shadow-glow-cyan whitespace-nowrap transition-all flex items-center justify-center space-x-2 shrink-0"
+        >
+          <span>Claim All-Access Pass ($9.99/mo)</span>
+          <ArrowRight className="w-3.5 h-3.5" />
+        </Link>
       </div>
 
       {/* Category Filter Tabs with Dynamic Count Badges */}
