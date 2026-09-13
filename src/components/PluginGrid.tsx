@@ -82,15 +82,15 @@ export const PluginGrid: React.FC = () => {
       {/* Section Header */}
       <div className="flex flex-col md:flex-row md:items-end justify-between mb-10 gap-6">
         <div>
-          <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-cyber-cyan/10 border border-cyber-cyan/20 text-xs font-bold text-cyber-cyan mb-3">
+          <div className="inline-flex items-center space-x-2 px-3.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-xs font-bold text-emerald-400 mb-3 shadow-glow-cyan">
             <Sparkles className="w-3.5 h-3.5" />
-            <span>15 FLAGSHIP C++ AUDIO PROCESSORS</span>
+            <span>ALL 15 PLUGINS RELEASED • LAUNCH SALE UP TO 50% OFF</span>
           </div>
           <h2 className="text-3xl sm:text-5xl font-black text-white tracking-tight">
-            The Complete Studio Catalog
+            The Complete PluggedIN Studio Suite
           </h2>
-          <p className="text-sm sm:text-base text-slate-400 mt-2 max-w-xl">
-            Each instrument and effect is custom-engineered in JUCE 7 for zero host latency, pristine 64-bit float analog modeling, and instant M1/M2/M3 & Windows x64 compatibility.
+          <p className="text-sm sm:text-base text-slate-300 mt-2 max-w-2xl">
+            Every instrument and processor is officially released and ready for your DAW. Save up to 50% on lifetime perpetual licenses, or unlock every single plugin with the All-Access Pass.
           </p>
         </div>
 

@@ -58,7 +58,9 @@ export const PluginCard: React.FC<PluginCardProps> = ({ plugin }) => {
             <span>•</span>
             <span>AU</span>
             <span>•</span>
-            <span className="text-slate-500">{plugin.devBuild}</span>
+            <span className="text-emerald-400 font-bold bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/30 text-[9px] uppercase tracking-wider">
+              RELEASED
+            </span>
           </div>
         </div>
 
@@ -124,8 +126,8 @@ export const PluginCard: React.FC<PluginCardProps> = ({ plugin }) => {
             <span className="text-xs text-slate-500 line-through font-mono">
               ${plugin.retailPrice}
             </span>
-            <span className="text-[10px] uppercase font-bold text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20">
-              Save {Math.round(((plugin.retailPrice - plugin.salePrice) / plugin.retailPrice) * 100)}%
+            <span className="text-[10px] uppercase font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
+              Launch -{Math.round(((plugin.retailPrice - plugin.salePrice) / plugin.retailPrice) * 100)}%
             </span>
           </div>
           <span className="text-[11px] text-slate-400 font-medium">Perpetual Lifetime</span>

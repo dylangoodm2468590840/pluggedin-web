@@ -96,8 +96,13 @@ export const PricingSection: React.FC = () => {
             </p>
 
             <div className="my-6">
-              <span className="text-4xl font-black text-white font-mono">$19 - $49</span>
-              <span className="text-xs text-slate-400 block mt-1">One-time payment per plugin</span>
+              <div className="flex items-baseline space-x-2">
+                <span className="text-4xl font-black text-white font-mono">$19 - $49</span>
+                <span className="text-[10px] uppercase font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
+                  Release Sale
+                </span>
+              </div>
+              <span className="text-xs text-slate-400 block mt-1">One-time payment per plugin (Reg. $39 - $99)</span>
             </div>
 
             <div className="space-y-3 pt-4 border-t border-white/5 text-xs text-slate-300">

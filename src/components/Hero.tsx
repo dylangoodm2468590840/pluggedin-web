@@ -91,11 +91,11 @@ export const Hero: React.FC = () => {
                     <div className="w-3 h-3 rounded-full bg-amber-500/80" />
                     <div className="w-3 h-3 rounded-full bg-emerald-500/80" />
                   </div>
-                  <span className="text-xs font-mono text-slate-400">PLUGGEDIN STUDIO RACK ENGINE • 15 ACTIVE HARDWARE PROCESSORS</span>
+                  <span className="text-xs font-mono text-slate-400">PLUGGEDIN STUDIO SUITE • ALL 15 PLUGINS OFFICIALLY RELEASED</span>
                 </div>
-                <div className="flex items-center space-x-2 text-xs text-cyber-cyan font-mono font-bold bg-cyber-cyan/10 px-2.5 py-1 rounded-lg border border-cyber-cyan/20">
-                  <Zap className="w-3.5 h-3.5" />
-                  <span>32-BIT FLOAT 192kHz</span>
+                <div className="flex items-center space-x-2 text-xs text-emerald-400 font-mono font-bold bg-emerald-500/10 px-2.5 py-1 rounded-lg border border-emerald-500/30">
+                  <Sparkles className="w-3.5 h-3.5" />
+                  <span>LAUNCH SALE LIVE</span>
                 </div>
               </div>
 
@@ -108,7 +108,7 @@ export const Hero: React.FC = () => {
                       <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30">
                         SAMPLER
                       </span>
-                      <span className="text-xs font-mono text-slate-400">DEV-1022</span>
+                      <span className="text-[10px] font-mono text-emerald-400 font-bold bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">RELEASE v2.0</span>
                     </div>
                     <h3 className="text-lg font-black text-white mt-3">PLUGCHOP 2.0</h3>
                     <p className="text-xs text-slate-400 mt-1">16-Pad playable slicing MPC workstation with choke groups & auto-transient detection.</p>
@@ -127,16 +127,20 @@ export const Hero: React.FC = () => {
                   </div>
                   <div className="flex items-center justify-between pt-3 border-t border-white/5 text-xs">
                     <div>
-                      <span className="font-mono text-amber-400 font-bold block">$39 Perpetual</span>
-                      <span className="text-[10px] text-slate-500">or with All-Access</span>
+                      <div className="flex items-baseline space-x-1.5">
+                        <span className="font-mono text-amber-400 font-bold text-base">$39</span>
+                        <span className="font-mono text-slate-500 line-through text-xs">$79</span>
+                        <span className="text-[9px] font-bold text-emerald-400 bg-emerald-500/10 px-1 py-0.2 rounded">50% OFF</span>
+                      </div>
+                      <span className="text-[10px] text-slate-500">Perpetual Lifetime</span>
                     </div>
-                    <a
-                      href="#audio-demo"
+                    <Link
+                      href="/plugins/PlugChop"
                       className="px-3 py-1.5 rounded-lg bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 font-bold text-xs border border-amber-500/30 flex items-center space-x-1.5 transition-all shadow-glow-amber"
                     >
-                      <Play className="w-3 h-3 fill-current" />
-                      <span>Audition Tone</span>
-                    </a>
+                      <span>Explore Specs</span>
+                      <ArrowRight className="w-3 h-3" />
+                    </Link>
                   </div>
                 </div>
 
@@ -147,10 +151,10 @@ export const Hero: React.FC = () => {
                       <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded bg-cyber-cyan/20 text-cyber-cyan border border-cyber-cyan/30">
                         VOCAL MULTI-FX
                       </span>
-                      <span className="text-xs font-mono text-slate-400">DEV-1079</span>
+                      <span className="text-[10px] font-mono text-emerald-400 font-bold bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">RELEASE v1.0</span>
                     </div>
                     <h3 className="text-lg font-black text-white mt-3">PLUGTNE v1.0.3</h3>
-                    <p className="text-xs text-slate-400 mt-1">Real-time low-latency pitch snap in F Minor with dual vector oscilloscope & chromatic scale lock.</p>
+                    <p className="text-xs text-slate-400 mt-1">Real-time zero-latency pitch correction with dual vector oscilloscope & chromatic scale lock.</p>
                     
                     {/* Authentic Hardware GUI Screenshot */}
                     <Link href="/plugins/PLUGTNE" className="my-4 block rounded-xl overflow-hidden border border-cyber-cyan/20 bg-black/60 aspect-[16/10] relative group-hover:border-cyber-cyan/40 transition-all flex items-center justify-center p-1.5">
@@ -166,16 +170,20 @@ export const Hero: React.FC = () => {
                   </div>
                   <div className="flex items-center justify-between pt-3 border-t border-white/5 text-xs">
                     <div>
-                      <span className="font-mono text-cyber-cyan font-bold block">$49 Perpetual</span>
-                      <span className="text-[10px] text-slate-500">or with All-Access</span>
+                      <div className="flex items-baseline space-x-1.5">
+                        <span className="font-mono text-cyber-cyan font-bold text-base">$49</span>
+                        <span className="font-mono text-slate-500 line-through text-xs">$89</span>
+                        <span className="text-[9px] font-bold text-emerald-400 bg-emerald-500/10 px-1 py-0.2 rounded">45% OFF</span>
+                      </div>
+                      <span className="text-[10px] text-slate-500">Perpetual Lifetime</span>
                     </div>
-                    <a
-                      href="#audio-demo"
+                    <Link
+                      href="/plugins/PLUGTNE"
                       className="px-3 py-1.5 rounded-lg bg-cyber-cyan/15 hover:bg-cyber-cyan/25 text-cyber-cyan font-bold text-xs border border-cyber-cyan/30 flex items-center space-x-1.5 transition-all shadow-glow-cyan"
                     >
-                      <Play className="w-3 h-3 fill-current" />
-                      <span>Audition F Minor Vocal</span>
-                    </a>
+                      <span>Explore Specs</span>
+                      <ArrowRight className="w-3 h-3" />
+                    </Link>
                   </div>
                 </div>
 
@@ -186,7 +194,7 @@ export const Hero: React.FC = () => {
                       <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded bg-cyber-rose/20 text-cyber-rose border border-cyber-rose/30">
                         ANALOG HEAT
                       </span>
-                      <span className="text-xs font-mono text-slate-400">DEV-0110</span>
+                      <span className="text-[10px] font-mono text-emerald-400 font-bold bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">RELEASE v4.2</span>
                     </div>
                     <h3 className="text-lg font-black text-white mt-3">UNDERGRND v4.2</h3>
                     <p className="text-xs text-slate-400 mt-1">12AX7 tube saturation, pitch formant demon warping, and sub-bass generator for aggressive trap 808s.</p>
@@ -205,16 +213,20 @@ export const Hero: React.FC = () => {
                   </div>
                   <div className="flex items-center justify-between pt-3 border-t border-white/5 text-xs">
                     <div>
-                      <span className="font-mono text-cyber-rose font-bold block">$29 Perpetual</span>
-                      <span className="text-[10px] text-slate-500">or with All-Access</span>
+                      <div className="flex items-baseline space-x-1.5">
+                        <span className="font-mono text-cyber-rose font-bold text-base">$29</span>
+                        <span className="font-mono text-slate-500 line-through text-xs">$59</span>
+                        <span className="text-[9px] font-bold text-emerald-400 bg-emerald-500/10 px-1 py-0.2 rounded">50% OFF</span>
+                      </div>
+                      <span className="text-[10px] text-slate-500">Perpetual Lifetime</span>
                     </div>
-                    <a
-                      href="#audio-demo"
+                    <Link
+                      href="/plugins/UNDERGRND"
                       className="px-3 py-1.5 rounded-lg bg-cyber-rose/15 hover:bg-cyber-rose/25 text-cyber-rose font-bold text-xs border border-cyber-rose/30 flex items-center space-x-1.5 transition-all shadow-glow-rose"
                     >
-                      <Play className="w-3 h-3 fill-current" />
-                      <span>Audition Tone</span>
-                    </a>
+                      <span>Explore Specs</span>
+                      <ArrowRight className="w-3 h-3" />
+                    </Link>
                   </div>
                 </div>
               </div>

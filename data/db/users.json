@@ -1,0 +1,43 @@
+[
+  {
+    "id": "usr_founder_001",
+    "email": "dylan@pluggedin.studio",
+    "displayName": "Dylan (Founder)",
+    "passwordHash": "84dd415c490d6615cd51ccee1e40ab67c1c34a3fc4b7b0d293e21fac995c497eb066e75ee86b37da38ef6bc43fc30b3d935cba142128254d31e84cd7e29e93b4",
+    "salt": "59acff29540646fa377bee6064a08ac9",
+    "tier": "All-Access Studio Pass",
+    "isLifetimeVIP": true,
+    "subscriptionStatus": "active",
+    "ownedPlugins": [
+      "ALL_15_PLUGINS"
+    ],
+    "licenseKey": "PLUG-VIP-9999-STUDIO",
+    "authorizedMachines": [
+      "DESKTOP-STUDIO-MAIN",
+      "MACBOOK-PRO-M3"
+    ],
+    "createdAt": "2026-09-13T22:01:10.072Z",
+    "lastLoginAt": "2026-09-13T22:01:10.073Z"
+  },
+  {
+    "id": "usr_061e4a2e516d",
+    "email": "testproducer@hitmakers.com",
+    "displayName": "Metro Tester",
+    "passwordHash": "6ce059635eaa6ce22e82a4f32dc0950ae3625d6b1b507927aee5a86615d849ed85d279c9f6ee63be8c4679052dbd0668772c0ed58e85994c023e2ef49c411baf",
+    "salt": "f139eba439b3a3f01c3f97898af19e21",
+    "tier": "All-Access Studio Pass",
+    "isLifetimeVIP": false,
+    "subscriptionStatus": "active",
+    "ownedPlugins": [
+      "ALL_15_PLUGINS"
+    ],
+    "licenseKey": "PLUG-32E7-F963-5256",
+    "authorizedMachines": [
+      "PRIMARY-STUDIO-DEVICE"
+    ],
+    "createdAt": "2026-09-13T22:01:10.080Z",
+    "lastLoginAt": "2026-09-13T22:01:10.243Z",
+    "resetToken": null,
+    "resetTokenExpiry": null
+  }
+]

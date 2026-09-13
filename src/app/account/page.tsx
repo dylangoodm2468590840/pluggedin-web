@@ -2,51 +2,242 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { User, Key, ShieldCheck, Laptop, LogOut, Mail, Lock, Sparkles, CheckCircle2, AlertCircle, ArrowRight } from 'lucide-react';
-import { UserAccount } from '../../types';
+import {
+  User,
+  Key,
+  ShieldCheck,
+  Laptop,
+  LogOut,
+  Mail,
+  Lock,
+  Sparkles,
+  CheckCircle2,
+  AlertCircle,
+  ArrowRight,
+  Download,
+  Copy,
+  Check,
+  RefreshCw,
+} from 'lucide-react';
+
+interface UserProfile {
+  id: string;
+  email: string;
+  displayName: string;
+  tier: string;
+  isLifetimeVIP: boolean;
+  subscriptionStatus: string;
+  ownedPlugins: string[];
+  licenseKey: string;
+  authorizedMachines: string[];
+  createdAt: string;
+}
 
 export default function AccountPage() {
-  const [currentUser, setCurrentUser] = useState<UserAccount | null>(null);
-  const [isRegisterMode, setIsRegisterMode] = useState(false);
+  const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
+  const [authMode, setAuthMode] = useState<'login' | 'register' | 'forgot' | 'reset'>('login');
+
+  // Form states
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [displayName, setDisplayName] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [resetToken, setResetToken] = useState('');
+
+  // Promo code
   const [promoCode, setPromoCode] = useState('');
   const [promoMessage, setPromoMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
-  const [loading, setLoading] = useState(false);
 
-  // Load user from localStorage
+  // Status banners
+  const [loading, setLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [copiedKey, setCopiedKey] = useState(false);
+
+  // Check existing session from server or URL params on mount
   useEffect(() => {
-    const saved = localStorage.getItem('pluggedin_web_user');
-    if (saved) {
-      try {
-        setCurrentUser(JSON.parse(saved));
-      } catch {}
+    // Check URL parameters for reset token
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const mode = params.get('mode');
+      const token = params.get('token');
+      const paramEmail = params.get('email');
+
+      if (mode === 'reset' && token) {
+        setAuthMode('reset');
+        setResetToken(token);
+        if (paramEmail) setEmail(paramEmail);
+      }
     }
+
+    checkActiveSession();
   }, []);
 
-  const handleAuth = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!email) return;
-
-    setLoading(true);
-    setTimeout(() => {
-      const user: UserAccount = {
-        uid: 'user_' + Math.random().toString(36).substring(2, 9),
-        email,
-        displayName: email.split('@')[0],
-        tier: 'Standard',
-        isLifetimeVIP: false,
-        subscriptionStatus: 'none',
-        ownedPlugins: ['PlugChop'],
-        authorizedMachines: ['PRIMARY-STUDIO-RIG'],
-      };
-      setCurrentUser(user);
-      localStorage.setItem('pluggedin_web_user', JSON.stringify(user));
-      setLoading(false);
-    }, 600);
+  const checkActiveSession = async () => {
+    try {
+      const res = await fetch('/api/auth/me');
+      const data = await res.json();
+      if (data.success && data.user) {
+        setCurrentUser(data.user);
+        localStorage.setItem('pluggedin_web_user', JSON.stringify(data.user));
+      } else {
+        // Check local storage fallback
+        const saved = localStorage.getItem('pluggedin_web_user');
+        if (saved) {
+          try {
+            setCurrentUser(JSON.parse(saved));
+          } catch {}
+        }
+      }
+    } catch {
+      const saved = localStorage.getItem('pluggedin_web_user');
+      if (saved) {
+        try {
+          setCurrentUser(JSON.parse(saved));
+        } catch {}
+      }
+    }
   };
 
-  const handleLogout = () => {
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setErrorMessage(null);
+    setSuccessMessage(null);
+    setLoading(true);
+
+    try {
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email.trim(), password }),
+      });
+      const data = await res.json();
+
+      if (!res.ok || !data.success) {
+        setErrorMessage(data.error || 'Failed to sign in.');
+      } else {
+        setCurrentUser(data.user);
+        localStorage.setItem('pluggedin_web_user', JSON.stringify(data.user));
+        setSuccessMessage('Signed in successfully! Welcome back.');
+      }
+    } catch {
+      setErrorMessage('Network error while signing in. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleRegister = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setErrorMessage(null);
+    setSuccessMessage(null);
+    setLoading(true);
+
+    try {
+      const res = await fetch('/api/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: email.trim(),
+          password,
+          displayName: displayName.trim() || undefined,
+        }),
+      });
+      const data = await res.json();
+
+      if (!res.ok || !data.success) {
+        setErrorMessage(data.error || 'Failed to create account.');
+      } else {
+        setCurrentUser(data.user);
+        localStorage.setItem('pluggedin_web_user', JSON.stringify(data.user));
+        setSuccessMessage('Account created successfully! You are now signed in forever.');
+      }
+    } catch {
+      setErrorMessage('Network error while registering. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleForgotPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setErrorMessage(null);
+    setSuccessMessage(null);
+    setLoading(true);
+
+    try {
+      const res = await fetch('/api/auth/forgot-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email.trim() }),
+      });
+      const data = await res.json();
+
+      if (!res.ok || !data.success) {
+        setErrorMessage(data.error || 'Could not find an account with that email.');
+      } else {
+        setSuccessMessage(
+          'Password reset link generated! Click the button below to set your new password.'
+        );
+        if (data.resetToken) {
+          setResetToken(data.resetToken);
+        }
+      }
+    } catch {
+      setErrorMessage('Network error requesting password reset.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleResetPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setErrorMessage(null);
+    setSuccessMessage(null);
+
+    if (newPassword !== confirmPassword) {
+      setErrorMessage('Passwords do not match. Please re-type your new password.');
+      return;
+    }
+
+    if (newPassword.length < 6) {
+      setErrorMessage('Password must be at least 6 characters long.');
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      const res = await fetch('/api/auth/reset-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token: resetToken, newPassword }),
+      });
+      const data = await res.json();
+
+      if (!res.ok || !data.success) {
+        setErrorMessage(data.error || 'Failed to reset password. The link may have expired.');
+      } else {
+        setSuccessMessage('Password reset successful! You can now sign in with your new password.');
+        setTimeout(() => {
+          setAuthMode('login');
+          setPassword('');
+          setNewPassword('');
+          setConfirmPassword('');
+        }, 1200);
+      }
+    } catch {
+      setErrorMessage('Network error while resetting password.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleLogout = async () => {
+    try {
+      await fetch('/api/auth/logout', { method: 'POST' });
+    } catch {}
     setCurrentUser(null);
     localStorage.removeItem('pluggedin_web_user');
   };
@@ -68,28 +259,17 @@ export default function AccountPage() {
 
       if (data.success) {
         setPromoMessage({ type: 'success', text: data.message });
-        
-        // Update user state
-        const updated: UserAccount = currentUser
-          ? {
-              ...currentUser,
-              tier: 'Pioneer Beta Tester (Lifetime)',
-              isLifetimeVIP: true,
-              subscriptionStatus: 'active',
-              ownedPlugins: ['ALL_15_PLUGINS'],
-            }
-          : {
-              uid: 'user_vip_' + Math.random().toString(36).substring(2, 9),
-              email: 'vip-creator@studio.com',
-              displayName: 'VIP Creator',
-              tier: 'Pioneer Beta Tester (Lifetime)',
-              isLifetimeVIP: true,
-              subscriptionStatus: 'active',
-              ownedPlugins: ['ALL_15_PLUGINS'],
-              authorizedMachines: ['STUDIO-DESKTOP-01'],
-            };
-        setCurrentUser(updated);
-        localStorage.setItem('pluggedin_web_user', JSON.stringify(updated));
+        if (currentUser) {
+          const updated: UserProfile = {
+            ...currentUser,
+            tier: 'Pioneer Beta Tester (Lifetime)',
+            isLifetimeVIP: true,
+            subscriptionStatus: 'active',
+            ownedPlugins: ['ALL_15_PLUGINS'],
+          };
+          setCurrentUser(updated);
+          localStorage.setItem('pluggedin_web_user', JSON.stringify(updated));
+        }
       } else {
         setPromoMessage({ type: 'error', text: data.error || 'Invalid promo code.' });
       }
@@ -100,18 +280,27 @@ export default function AccountPage() {
     }
   };
 
+  const copyLicenseKey = () => {
+    if (currentUser?.licenseKey) {
+      navigator.clipboard.writeText(currentUser.licenseKey);
+      setCopiedKey(true);
+      setTimeout(() => setCopiedKey(false), 2000);
+    }
+  };
+
   return (
-    <div className="py-16 max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div className="py-16 max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 min-h-[75vh]">
       <div className="text-center max-w-xl mx-auto mb-10 space-y-2">
         <h1 className="text-3xl sm:text-4xl font-black text-white">
-          Producer Account & License Portal
+          Producer Account &amp; License Portal
         </h1>
         <p className="text-xs sm:text-sm text-slate-400">
-          Manage your active plugins, redeem VIP beta codes, and view machine activations.
+          Permanent cloud credentials for PluggedIN Central, software activations, and All-Access passes.
         </p>
       </div>
 
       {currentUser ? (
+        /* LOGGED IN MEMBER DASHBOARD */
         <div className="space-y-8">
           {/* User Profile Banner */}
           <div className="glass-panel rounded-3xl p-6 sm:p-8 border border-white/10 flex flex-col sm:flex-row sm:items-center justify-between gap-6">
@@ -122,11 +311,13 @@ export default function AccountPage() {
               <div>
                 <div className="flex items-center space-x-2">
                   <h2 className="text-lg font-black text-white">{currentUser.displayName}</h2>
-                  <span className={`text-[10px] font-extrabold uppercase tracking-wider px-2.5 py-0.5 rounded-full border ${
-                    currentUser.isLifetimeVIP
-                      ? 'bg-amber-500/10 text-amber-300 border-amber-500/30'
-                      : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
-                  }`}>
+                  <span
+                    className={`text-[10px] font-extrabold uppercase tracking-wider px-2.5 py-0.5 rounded-full border ${
+                      currentUser.isLifetimeVIP
+                        ? 'bg-amber-500/10 text-amber-300 border-amber-500/30'
+                        : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                    }`}
+                  >
                     {currentUser.tier}
                   </span>
                 </div>
@@ -139,7 +330,7 @@ export default function AccountPage() {
                   <span>•</span>
                   <span className="flex items-center space-x-1">
                     <Laptop className="w-3.5 h-3.5" />
-                    <span>1 of 3 Devices Used</span>
+                    <span>{currentUser.authorizedMachines?.length || 1} of 3 Studio Devices</span>
                   </span>
                 </div>
               </div>
@@ -152,6 +343,46 @@ export default function AccountPage() {
               <LogOut className="w-4 h-4" />
               <span>Sign Out</span>
             </button>
+          </div>
+
+          {/* Master License Key & Central Sync */}
+          <div className="glass-panel rounded-3xl p-6 sm:p-8 border border-cyber-cyan/30 bg-gradient-to-r from-cyber-cyan/5 via-transparent to-transparent space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <span className="text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-cyber-cyan/10 text-cyber-cyan border border-cyber-cyan/30">
+                  CLOUD LICENSE SYNC
+                </span>
+                <h3 className="text-lg font-black text-white mt-2">Master Studio Serial Key</h3>
+                <p className="text-xs text-slate-400">Use this license key inside PluggedIN Central to unlock all 15 plugins.</p>
+              </div>
+
+              <div className="flex items-center space-x-2">
+                <div className="font-mono text-sm font-black text-cyber-cyan bg-studio-950 px-4 py-2 rounded-xl border border-cyber-cyan/30">
+                  {currentUser.licenseKey || 'PLUG-VIP-9999-STUDIO'}
+                </div>
+                <button
+                  onClick={copyLicenseKey}
+                  className="px-3 py-2 rounded-xl bg-cyber-cyan/20 hover:bg-cyber-cyan/30 text-cyber-cyan border border-cyber-cyan/40 text-xs font-bold flex items-center space-x-1 transition-all"
+                  title="Copy License Key"
+                >
+                  {copiedKey ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                  <span>{copiedKey ? 'Copied' : 'Copy'}</span>
+                </button>
+              </div>
+            </div>
+
+            <div className="pt-4 border-t border-white/10 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs">
+              <span className="text-slate-400">
+                Log into <strong>PluggedIN Central</strong> with this email ({currentUser.email}) to auto-sync licenses.
+              </span>
+              <Link
+                href="/download"
+                className="px-4 py-2 rounded-xl bg-gradient-to-r from-cyber-cyan to-blue-600 text-black font-black text-xs shadow-glow-cyan hover:brightness-110 transition-all flex items-center space-x-1.5"
+              >
+                <Download className="w-3.5 h-3.5" />
+                <span>Download Desktop Central</span>
+              </Link>
+            </div>
           </div>
 
           {/* Promo Code Redemption Section */}
@@ -167,12 +398,18 @@ export default function AccountPage() {
             </div>
 
             {promoMessage && (
-              <div className={`p-3 rounded-xl mb-4 text-xs flex items-center space-x-2 border ${
-                promoMessage.type === 'success'
-                  ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400'
-                  : 'bg-rose-500/10 border-rose-500/20 text-rose-400'
-              }`}>
-                {promoMessage.type === 'success' ? <CheckCircle2 className="w-4 h-4 shrink-0" /> : <AlertCircle className="w-4 h-4 shrink-0" />}
+              <div
+                className={`p-3 rounded-xl mb-4 text-xs flex items-center space-x-2 border ${
+                  promoMessage.type === 'success'
+                    ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400'
+                    : 'bg-rose-500/10 border-rose-500/20 text-rose-400'
+                }`}
+              >
+                {promoMessage.type === 'success' ? (
+                  <CheckCircle2 className="w-4 h-4 shrink-0" />
+                ) : (
+                  <AlertCircle className="w-4 h-4 shrink-0" />
+                )}
                 <span>{promoMessage.text}</span>
               </div>
             )}
@@ -180,113 +417,342 @@ export default function AccountPage() {
             <form onSubmit={handleRedeemCode} className="flex flex-col sm:flex-row gap-3">
               <input
                 type="text"
+                placeholder="e.g. VIP-LAUNCH-2026"
                 value={promoCode}
                 onChange={(e) => setPromoCode(e.target.value)}
-                placeholder="Try DYLANVIP or HOMIEPASS..."
-                className="flex-1 px-4 py-3 bg-studio-950/80 border border-white/10 rounded-xl text-xs sm:text-sm text-white placeholder-slate-500 focus:outline-none focus:border-amber-500/50 uppercase font-mono tracking-wider transition-all"
+                className="flex-1 px-4 py-3 rounded-xl bg-studio-900 border border-white/10 text-white placeholder-slate-500 text-xs font-mono focus:outline-none focus:border-amber-500/50"
               />
               <button
                 type="submit"
-                disabled={loading}
-                className="px-6 py-3 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 text-black text-xs font-black shadow-glow-amber hover:brightness-110 active:scale-95 transition-all flex items-center justify-center space-x-1.5 disabled:opacity-50"
+                disabled={loading || !promoCode.trim()}
+                className="px-6 py-3 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 text-xs font-bold transition-all disabled:opacity-50"
               >
-                <Key className="w-4 h-4" />
-                <span>{loading ? 'Validating...' : 'Apply Code'}</span>
+                {loading ? 'Validating...' : 'Redeem Code'}
               </button>
             </form>
           </div>
-
-          {/* Active Licenses List */}
-          <div className="glass-panel rounded-3xl p-6 sm:p-8 border border-white/10 space-y-4">
-            <div className="flex items-center justify-between pb-3 border-b border-white/5">
-              <h3 className="text-base font-black text-white">Registered Studio Licenses</h3>
-              <span className="text-xs text-cyber-cyan font-mono font-bold">15 PLUGINS SYNCED</span>
-            </div>
-
-            <div className="space-y-2">
-              <div className="p-4 rounded-xl bg-studio-900/60 border border-white/5 flex items-center justify-between">
-                <div className="flex items-center space-x-3">
-                  <div className="w-9 h-9 rounded-lg bg-cyber-cyan/10 text-cyber-cyan flex items-center justify-center font-bold">
-                    ★
-                  </div>
-                  <div>
-                    <h4 className="text-xs font-bold text-white">PluggedIN Complete Studio Bundle</h4>
-                    <p className="text-[11px] text-slate-400">Includes PlugChop 2.0, PLUGTNE, UNDERGRND, PLUGGED 1, and 11 more</p>
-                  </div>
-                </div>
-                <span className="flex items-center space-x-1 px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[10px] font-bold">
-                  <CheckCircle2 className="w-3 h-3" />
-                  <span>Activated in Central</span>
-                </span>
-              </div>
-            </div>
-          </div>
         </div>
       ) : (
-        /* Sign In / Sign Up Card */
-        <div className="max-w-md mx-auto glass-panel rounded-3xl p-8 border border-white/10 space-y-6">
-          <div className="text-center space-y-1">
-            <h2 className="text-2xl font-black text-white">
-              {isRegisterMode ? 'Create Studio Account' : 'Sign In to PluggedIN'}
-            </h2>
-            <p className="text-xs text-slate-400">
-              Access your cloud licenses, preset library, and link with Central.
-            </p>
+        /* AUTHENTICATION SCREENS (LOGIN / REGISTER / FORGOT / RESET) */
+        <div className="max-w-md mx-auto">
+          {/* Navigation Tabs */}
+          <div className="flex rounded-2xl bg-studio-900 border border-white/10 p-1 mb-8">
+            <button
+              onClick={() => {
+                setAuthMode('login');
+                setErrorMessage(null);
+                setSuccessMessage(null);
+              }}
+              className={`flex-1 py-2.5 rounded-xl text-xs font-bold transition-all ${
+                authMode === 'login'
+                  ? 'bg-cyber-cyan text-black shadow-glow-cyan'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              Sign In
+            </button>
+            <button
+              onClick={() => {
+                setAuthMode('register');
+                setErrorMessage(null);
+                setSuccessMessage(null);
+              }}
+              className={`flex-1 py-2.5 rounded-xl text-xs font-bold transition-all ${
+                authMode === 'register'
+                  ? 'bg-cyber-purple text-white shadow-glow-purple'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              Create Account
+            </button>
           </div>
 
-          <form onSubmit={handleAuth} className="space-y-4">
-            <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-slate-300">Email Address</label>
-              <div className="relative flex items-center">
-                <Mail className="w-4 h-4 text-slate-500 absolute left-3.5" />
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="producer@studio.com"
-                  className="w-full pl-10 pr-4 py-2.5 bg-studio-950 border border-white/10 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyber-cyan/50 transition-all"
-                  required
-                />
+          {/* Feedback alerts */}
+          {errorMessage && (
+            <div className="p-3.5 rounded-xl mb-6 text-xs flex items-center space-x-2 bg-rose-500/10 border border-rose-500/30 text-rose-400">
+              <AlertCircle className="w-4 h-4 shrink-0" />
+              <span>{errorMessage}</span>
+            </div>
+          )}
+
+          {successMessage && (
+            <div className="p-3.5 rounded-xl mb-6 text-xs flex items-center space-x-2 bg-emerald-500/10 border border-emerald-500/30 text-emerald-400">
+              <CheckCircle2 className="w-4 h-4 shrink-0" />
+              <span>{successMessage}</span>
+            </div>
+          )}
+
+          {/* MODE: SIGN IN */}
+          {authMode === 'login' && (
+            <div className="glass-panel rounded-3xl p-8 border border-white/10">
+              <h2 className="text-xl font-black text-white mb-2">Welcome Back</h2>
+              <p className="text-xs text-slate-400 mb-6">
+                Sign in to manage your licenses and connect PluggedIN Central.
+              </p>
+
+              <form onSubmit={handleLogin} className="space-y-4">
+                <div>
+                  <label className="block text-xs font-medium text-slate-300 mb-1.5">Email Address</label>
+                  <div className="relative">
+                    <Mail className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                    <input
+                      type="email"
+                      required
+                      placeholder="producer@studio.com"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      className="w-full pl-10 pr-4 py-3 rounded-xl bg-studio-900 border border-white/10 text-white placeholder-slate-500 text-xs focus:outline-none focus:border-cyber-cyan/50"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="block text-xs font-medium text-slate-300">Password</label>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setAuthMode('forgot');
+                        setErrorMessage(null);
+                        setSuccessMessage(null);
+                      }}
+                      className="text-[11px] text-cyber-cyan hover:underline"
+                    >
+                      Forgot password?
+                    </button>
+                  </div>
+                  <div className="relative">
+                    <Lock className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                    <input
+                      type="password"
+                      required
+                      placeholder="••••••••"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      className="w-full pl-10 pr-4 py-3 rounded-xl bg-studio-900 border border-white/10 text-white placeholder-slate-500 text-xs focus:outline-none focus:border-cyber-cyan/50"
+                    />
+                  </div>
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="w-full py-3.5 rounded-xl bg-cyber-cyan hover:bg-cyber-cyan/90 text-black text-xs font-black shadow-glow-cyan transition-all disabled:opacity-50 mt-2"
+                >
+                  {loading ? 'Authenticating...' : 'Sign In'}
+                </button>
+              </form>
+
+              <div className="mt-6 pt-6 border-t border-white/5 text-center text-xs text-slate-400">
+                Don&apos;t have an account?{' '}
+                <button
+                  onClick={() => {
+                    setAuthMode('register');
+                    setErrorMessage(null);
+                    setSuccessMessage(null);
+                  }}
+                  className="text-cyber-cyan font-bold hover:underline"
+                >
+                  Create one now
+                </button>
               </div>
             </div>
+          )}
 
-            <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-slate-300">Password</label>
-              <div className="relative flex items-center">
-                <Lock className="w-4 h-4 text-slate-500 absolute left-3.5" />
-                <input
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••••••"
-                  className="w-full pl-10 pr-4 py-2.5 bg-studio-950 border border-white/10 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyber-cyan/50 transition-all"
-                  required
-                />
+          {/* MODE: REGISTER */}
+          {authMode === 'register' && (
+            <div className="glass-panel rounded-3xl p-8 border border-white/10">
+              <h2 className="text-xl font-black text-white mb-2">Create Permanent Account</h2>
+              <p className="text-xs text-slate-400 mb-6">
+                Your credentials will be saved forever so you can always log into Central.
+              </p>
+
+              <form onSubmit={handleRegister} className="space-y-4">
+                <div>
+                  <label className="block text-xs font-medium text-slate-300 mb-1.5">Producer / Display Name</label>
+                  <div className="relative">
+                    <User className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                    <input
+                      type="text"
+                      placeholder="e.g. Metro Beats"
+                      value={displayName}
+                      onChange={(e) => setDisplayName(e.target.value)}
+                      className="w-full pl-10 pr-4 py-3 rounded-xl bg-studio-900 border border-white/10 text-white placeholder-slate-500 text-xs focus:outline-none focus:border-cyber-purple/50"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium text-slate-300 mb-1.5">Email Address</label>
+                  <div className="relative">
+                    <Mail className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                    <input
+                      type="email"
+                      required
+                      placeholder="producer@studio.com"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      className="w-full pl-10 pr-4 py-3 rounded-xl bg-studio-900 border border-white/10 text-white placeholder-slate-500 text-xs focus:outline-none focus:border-cyber-purple/50"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium text-slate-300 mb-1.5">Password</label>
+                  <div className="relative">
+                    <Lock className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                    <input
+                      type="password"
+                      required
+                      placeholder="At least 6 characters"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      className="w-full pl-10 pr-4 py-3 rounded-xl bg-studio-900 border border-white/10 text-white placeholder-slate-500 text-xs focus:outline-none focus:border-cyber-purple/50"
+                    />
+                  </div>
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="w-full py-3.5 rounded-xl bg-cyber-purple hover:bg-cyber-purple/90 text-white text-xs font-black shadow-glow-purple transition-all disabled:opacity-50 mt-2"
+                >
+                  {loading ? 'Creating Account...' : 'Create Account & Save Credentials'}
+                </button>
+              </form>
+
+              <div className="mt-6 pt-6 border-t border-white/5 text-center text-xs text-slate-400">
+                Already have an account?{' '}
+                <button
+                  onClick={() => {
+                    setAuthMode('login');
+                    setErrorMessage(null);
+                    setSuccessMessage(null);
+                  }}
+                  className="text-cyber-purple font-bold hover:underline"
+                >
+                  Sign in here
+                </button>
               </div>
             </div>
+          )}
 
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full py-3 rounded-xl bg-gradient-to-r from-cyber-cyan to-blue-600 text-black text-xs font-black shadow-glow-cyan hover:brightness-110 active:scale-95 transition-all flex items-center justify-center space-x-2"
-            >
-              {loading ? (
-                <span>Authenticating...</span>
-              ) : (
-                <span>{isRegisterMode ? 'Create Free Account' : 'Sign In'}</span>
+          {/* MODE: FORGOT PASSWORD */}
+          {authMode === 'forgot' && (
+            <div className="glass-panel rounded-3xl p-8 border border-white/10">
+              <h2 className="text-xl font-black text-white mb-2">Reset Your Password</h2>
+              <p className="text-xs text-slate-400 mb-6">
+                Enter your account email. We will generate an instant secure recovery link so you can reset your password immediately.
+              </p>
+
+              <form onSubmit={handleForgotPassword} className="space-y-4">
+                <div>
+                  <label className="block text-xs font-medium text-slate-300 mb-1.5">Email Address</label>
+                  <div className="relative">
+                    <Mail className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                    <input
+                      type="email"
+                      required
+                      placeholder="producer@studio.com"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      className="w-full pl-10 pr-4 py-3 rounded-xl bg-studio-900 border border-white/10 text-white placeholder-slate-500 text-xs focus:outline-none focus:border-cyber-cyan/50"
+                    />
+                  </div>
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="w-full py-3.5 rounded-xl bg-cyber-cyan hover:bg-cyber-cyan/90 text-black text-xs font-black shadow-glow-cyan transition-all disabled:opacity-50"
+                >
+                  {loading ? 'Finding Account...' : 'Send Recovery Link'}
+                </button>
+              </form>
+
+              {resetToken && (
+                <div className="mt-6 p-4 rounded-xl bg-cyber-cyan/10 border border-cyber-cyan/30 text-center space-y-3">
+                  <p className="text-xs text-cyber-cyan font-bold">
+                    Recovery Token Verified for {email}
+                  </p>
+                  <button
+                    onClick={() => {
+                      setAuthMode('reset');
+                      setErrorMessage(null);
+                      setSuccessMessage(null);
+                    }}
+                    className="w-full py-2.5 rounded-xl bg-cyber-cyan text-black font-black text-xs shadow-glow-cyan hover:brightness-110 transition-all"
+                  >
+                    Proceed to Enter New Password &rarr;
+                  </button>
+                </div>
               )}
-            </button>
-          </form>
 
-          <div className="text-center pt-2">
-            <button
-              type="button"
-              onClick={() => setIsRegisterMode(!isRegisterMode)}
-              className="text-xs text-slate-400 hover:text-cyber-cyan transition-all"
-            >
-              {isRegisterMode ? 'Already have an account? Sign in here' : "Don't have an account yet? Register for free"}
-            </button>
-          </div>
+              <div className="mt-6 pt-6 border-t border-white/5 text-center text-xs text-slate-400">
+                Remember your password?{' '}
+                <button
+                  onClick={() => {
+                    setAuthMode('login');
+                    setErrorMessage(null);
+                    setSuccessMessage(null);
+                  }}
+                  className="text-cyber-cyan font-bold hover:underline"
+                >
+                  Back to Sign In
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* MODE: RESET PASSWORD */}
+          {authMode === 'reset' && (
+            <div className="glass-panel rounded-3xl p-8 border border-white/10">
+              <h2 className="text-xl font-black text-white mb-2">Set New Password</h2>
+              <p className="text-xs text-slate-400 mb-6">
+                Enter your new password below. Your account will be immediately updated.
+              </p>
+
+              <form onSubmit={handleResetPassword} className="space-y-4">
+                <div>
+                  <label className="block text-xs font-medium text-slate-300 mb-1.5">New Password</label>
+                  <div className="relative">
+                    <Lock className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                    <input
+                      type="password"
+                      required
+                      placeholder="At least 6 characters"
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      className="w-full pl-10 pr-4 py-3 rounded-xl bg-studio-900 border border-white/10 text-white placeholder-slate-500 text-xs focus:outline-none focus:border-cyber-cyan/50"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium text-slate-300 mb-1.5">Confirm New Password</label>
+                  <div className="relative">
+                    <Lock className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                    <input
+                      type="password"
+                      required
+                      placeholder="Re-type new password"
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      className="w-full pl-10 pr-4 py-3 rounded-xl bg-studio-900 border border-white/10 text-white placeholder-slate-500 text-xs focus:outline-none focus:border-cyber-cyan/50"
+                    />
+                  </div>
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="w-full py-3.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-black shadow-lg transition-all disabled:opacity-50 mt-2"
+                >
+                  {loading ? 'Updating Password...' : 'Save New Password & Sign In'}
+                </button>
+              </form>
+            </div>
+          )}
         </div>
       )}
     </div>
