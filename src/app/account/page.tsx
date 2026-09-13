@@ -45,10 +45,6 @@ export default function AccountPage() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [resetToken, setResetToken] = useState('');
 
-  // Promo code
-  const [promoCode, setPromoCode] = useState('');
-  const [promoMessage, setPromoMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
-
   // Status banners
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -250,44 +246,6 @@ export default function AccountPage() {
     localStorage.removeItem('pluggedin_web_user');
   };
 
-  const handleRedeemCode = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!promoCode.trim()) return;
-
-    setLoading(true);
-    setPromoMessage(null);
-
-    try {
-      const res = await fetch('/api/promo/validate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ code: promoCode.trim() }),
-      });
-      const data = await res.json();
-
-      if (data.success) {
-        setPromoMessage({ type: 'success', text: data.message });
-        if (currentUser) {
-          const updated: UserProfile = {
-            ...currentUser,
-            tier: 'Pioneer Beta Tester (Lifetime)',
-            isLifetimeVIP: true,
-            subscriptionStatus: 'active',
-            ownedPlugins: ['ALL_15_PLUGINS'],
-          };
-          setCurrentUser(updated);
-          localStorage.setItem('pluggedin_web_user', JSON.stringify(updated));
-        }
-      } else {
-        setPromoMessage({ type: 'error', text: data.error || 'Invalid promo code.' });
-      }
-    } catch {
-      setPromoMessage({ type: 'error', text: 'Network error validating code.' });
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const copyLicenseKey = () => {
     if (currentUser?.licenseKey) {
       navigator.clipboard.writeText(currentUser.licenseKey);
@@ -424,53 +382,6 @@ export default function AccountPage() {
                 <span>Download Desktop Central</span>
               </Link>
             </div>
-          </div>
-
-          {/* Promo Code Redemption Section */}
-          <div className="glass-panel rounded-3xl p-6 sm:p-8 border border-amber-500/30 bg-gradient-to-r from-amber-500/5 via-transparent to-transparent">
-            <div className="flex items-center space-x-3 mb-4">
-              <div className="w-9 h-9 rounded-xl bg-amber-500/20 text-amber-300 flex items-center justify-center">
-                <Key className="w-5 h-5" />
-              </div>
-              <div>
-                <h3 className="text-base font-black text-white">Redeem VIP or Creator Code</h3>
-                <p className="text-xs text-slate-400">Enter a code from Dylan or our team to unlock full studio access.</p>
-              </div>
-            </div>
-
-            {promoMessage && (
-              <div
-                className={`p-3 rounded-xl mb-4 text-xs flex items-center space-x-2 border ${
-                  promoMessage.type === 'success'
-                    ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400'
-                    : 'bg-rose-500/10 border-rose-500/20 text-rose-400'
-                }`}
-              >
-                {promoMessage.type === 'success' ? (
-                  <CheckCircle2 className="w-4 h-4 shrink-0" />
-                ) : (
-                  <AlertCircle className="w-4 h-4 shrink-0" />
-                )}
-                <span>{promoMessage.text}</span>
-              </div>
-            )}
-
-            <form onSubmit={handleRedeemCode} className="flex flex-col sm:flex-row gap-3">
-              <input
-                type="text"
-                placeholder="e.g. VIP-LAUNCH-2026"
-                value={promoCode}
-                onChange={(e) => setPromoCode(e.target.value)}
-                className="flex-1 px-4 py-3 rounded-xl bg-studio-900 border border-white/10 text-white placeholder-slate-500 text-xs font-mono focus:outline-none focus:border-amber-500/50"
-              />
-              <button
-                type="submit"
-                disabled={loading || !promoCode.trim()}
-                className="px-6 py-3 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 text-xs font-bold transition-all disabled:opacity-50"
-              >
-                {loading ? 'Validating...' : 'Redeem Code'}
-              </button>
-            </form>
           </div>
         </div>
       ) : (

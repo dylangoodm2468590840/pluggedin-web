@@ -34,9 +34,9 @@ export default function PricingPage() {
           </div>
 
           <div className="glass-panel p-6 rounded-2xl border border-white/10 space-y-2">
-            <h4 className="font-bold text-white">How do promo codes work?</h4>
+            <h4 className="font-bold text-white">Do I need an internet connection to use plugins?</h4>
             <p className="text-slate-400 leading-relaxed">
-              If you receive a creator or beta test promo code from Dylan or our team, enter it in your Account portal to unlock full All-Access privileges with no credit card required.
+              No! Once authorized through PluggedIN Central, all plugins run 100% offline in your DAW with zero internet connection or hardware dongles required.
             </p>
           </div>
         </div>

@@ -43,9 +43,6 @@ export const Header: React.FC = () => {
             <Download className="w-4 h-4 text-slate-400" />
             <span>Download Central</span>
           </Link>
-          <Link href="/account" className="hover:text-white transition-colors text-xs font-semibold px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 border border-white/5">
-            Redeem VIP Code
-          </Link>
         </nav>
 
         {/* Action CTAs */}
@@ -63,7 +60,7 @@ export const Header: React.FC = () => {
             className="flex items-center space-x-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-cyber-cyan to-blue-600 text-black text-xs font-black shadow-glow-cyan hover:brightness-110 active:scale-95 transition-all"
           >
             <Sparkles className="w-4 h-4" />
-            <span>Get Pass • $14.99</span>
+            <span>Get Pass • $9.99</span>
           </Link>
         </div>
 
@@ -115,13 +112,6 @@ export const Header: React.FC = () => {
             className="block text-base font-semibold text-slate-200"
           >
             Download PluggedIN Central
-          </Link>
-          <Link
-            href="/account"
-            onClick={() => setMobileMenuOpen(false)}
-            className="block text-base font-semibold text-amber-400"
-          >
-            Redeem VIP Promo Code
           </Link>
           <div className="pt-4 border-t border-white/5 flex flex-col space-y-3">
             <Link

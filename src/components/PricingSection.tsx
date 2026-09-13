@@ -192,7 +192,7 @@ export const PricingSection: React.FC = () => {
             </div>
 
             <Link
-              href="/account"
+              href="/checkout?plan=monthly"
               className="mt-8 w-full py-4 rounded-xl bg-gradient-to-r from-cyber-cyan to-blue-600 text-black text-sm font-black shadow-glow-cyan hover:brightness-110 active:scale-95 transition-all text-center block"
             >
               Claim All-Access Pass Now
@@ -200,48 +200,59 @@ export const PricingSection: React.FC = () => {
           </div>
         </div>
 
-        {/* Tier 3: VIP Creator & Friends Pass */}
+        {/* Tier 3: Annual Studio Pass */}
         <div className="glass-panel rounded-3xl p-8 flex flex-col justify-between border border-white/10 glass-card-hover">
           <div>
-            <span className="text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30">
-              CREATORS & BETA TESTERS
-            </span>
-            <h3 className="text-2xl font-black text-white mt-4">VIP Promo Pass</h3>
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-cyber-purple/20 text-cyber-purple border border-cyber-purple/30">
+                ANNUAL COMMITMENT
+              </span>
+              <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-cyber-cyan text-black shadow">
+                SAVE 45%
+              </span>
+            </div>
+            <h3 className="text-2xl font-black text-white mt-4">Annual Studio Pass</h3>
             <p className="text-xs text-slate-400 mt-2">
-              Received a creator code from Dylan or our beta team? Redeem your code to unlock lifetime access with zero payment required.
+              Lock in full studio access for an entire year at our lowest effective rate. Full suite included.
             </p>
 
             <div className="my-6">
-              <span className="text-4xl font-black text-amber-400 font-mono">100% Free</span>
-              <span className="text-xs text-slate-400 block mt-1">With valid invite or beta code</span>
+              <div className="flex items-baseline space-x-2">
+                <span className="text-4xl font-black text-white font-mono">$99</span>
+                <span className="text-xs text-slate-400 font-mono">/ year</span>
+              </div>
+              <span className="text-xs text-emerald-400 block mt-1 font-medium">Only $8.25/mo • Save $80 vs Monthly</span>
             </div>
 
             <div className="space-y-3 pt-4 border-t border-white/5 text-xs text-slate-300">
               <div className="flex items-center space-x-2">
-                <Check className="w-4 h-4 text-amber-400 shrink-0" />
-                <span>Instant full studio pass activation</span>
+                <Check className="w-4 h-4 text-emerald-400 shrink-0" />
+                <span>All 15 Flagship Plugins unlocked instantly</span>
               </div>
               <div className="flex items-center space-x-2">
-                <Check className="w-4 h-4 text-amber-400 shrink-0" />
-                <span>Zero credit card or payment info required</span>
+                <Check className="w-4 h-4 text-emerald-400 shrink-0" />
+                <span>Includes all future plugins and updates</span>
               </div>
               <div className="flex items-center space-x-2">
-                <Check className="w-4 h-4 text-amber-400 shrink-0" />
-                <span>Syncs with Central desktop app immediately</span>
+                <Check className="w-4 h-4 text-emerald-400 shrink-0" />
+                <span>Authorized on up to 5 studio machines</span>
               </div>
               <div className="flex items-center space-x-2">
-                <Check className="w-4 h-4 text-amber-400 shrink-0" />
-                <span>Early access to pre-release beta builds</span>
+                <Check className="w-4 h-4 text-emerald-400 shrink-0" />
+                <span>1-Click Cloud Sync in PluggedIN Central</span>
+              </div>
+              <div className="flex items-center space-x-2">
+                <Check className="w-4 h-4 text-emerald-400 shrink-0" />
+                <span>30-Day Money-Back Guarantee</span>
               </div>
             </div>
           </div>
 
           <Link
-            href="/account"
-            className="mt-8 w-full py-3.5 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 text-xs font-bold border border-amber-500/30 transition-all text-center flex items-center justify-center space-x-1.5"
+            href="/checkout?plan=annual"
+            className="mt-8 w-full py-3.5 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-bold border border-white/10 transition-all text-center block"
           >
-            <Key className="w-4 h-4" />
-            <span>Redeem VIP Code</span>
+            Get Annual Pass ($99/yr)
           </Link>
         </div>
       </div>
@@ -262,7 +273,7 @@ export const PricingSection: React.FC = () => {
                 <th className="py-4 px-4">Feature / Benefit</th>
                 <th className="py-4 px-4 text-center">Single Perpetual</th>
                 <th className="py-4 px-4 text-center text-cyber-cyan font-bold">All-Access Pass</th>
-                <th className="py-4 px-4 text-center text-amber-300">VIP Pass</th>
+                <th className="py-4 px-4 text-center text-cyber-purple font-bold">Annual Pass</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-white/5">
@@ -271,7 +282,7 @@ export const PricingSection: React.FC = () => {
                   <td className="py-3.5 px-4 text-slate-300 font-medium">{row.feature}</td>
                   <td className="py-3.5 px-4 text-center text-slate-400">{row.single}</td>
                   <td className="py-3.5 px-4 text-center text-white font-bold bg-cyber-cyan/5">{row.allAccess}</td>
-                  <td className="py-3.5 px-4 text-center text-amber-400">{row.founders}</td>
+                  <td className="py-3.5 px-4 text-center text-slate-300">{row.founders}</td>
                 </tr>
               ))}
             </tbody>

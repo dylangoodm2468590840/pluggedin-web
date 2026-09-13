@@ -62,7 +62,7 @@ export const Footer: React.FC = () => {
               </li>
               <li>
                 <Link href="/pricing" className="hover:text-cyber-purple transition-colors">
-                  All-Access Pass ($14.99/mo)
+                  All-Access Pass ($9.99/mo)
                 </Link>
               </li>
               <li>
@@ -71,8 +71,8 @@ export const Footer: React.FC = () => {
                 </Link>
               </li>
               <li>
-                <Link href="/account" className="hover:text-amber-400 transition-colors">
-                  Redeem VIP Promo Code
+                <Link href="/account" className="hover:text-cyber-cyan transition-colors">
+                  Producer Account &amp; Licenses
                 </Link>
               </li>
             </ul>
