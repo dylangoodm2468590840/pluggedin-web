@@ -9,12 +9,20 @@ interface PluginMiniPlayerProps {
 
 const PLUGIN_DEMO_MAP: Record<string, { title: string; dry: string; wet: string; dryLabel: string; wetLabel: string; desc: string }> = {
   PLUGTNE: {
-    title: 'F Minor Vocal Autotune Comparison',
+    title: 'Travis Scott 0ms Hard-Tune Comparison',
+    dry: '/audio/vocal_dry.wav',
+    wet: '/audio/vocal_tuned.wav',
+    dryLabel: 'Raw Dylan Desktop Mic',
+    wetLabel: 'PLUGTNE Travis Scott Hard-Tune',
+    desc: 'Prominent 0ms retune speed with rigid scale snapping to F Minor and characteristic robotic stair-stepping.',
+  },
+  PlugRack: {
+    title: 'Cactus Crisp Vocal Chain Preset',
     dry: '/audio/vocal_dry.wav',
     wet: '/audio/vocal_wet.wav',
-    dryLabel: 'Raw Dylan Desktop Mic',
-    wetLabel: 'PLUGTNE F Minor AutoTune',
-    desc: 'Notice instant hard-tune snapping in F Minor and pitch stabilization across vocal transients.',
+    dryLabel: 'Raw Unprocessed Mic',
+    wetLabel: 'PLUGRACK Cactus Crisp Lead',
+    desc: 'Flagship modular rack hosting Travis Scott hard-tune, 12kHz harmonic air exciter, RVox dynamics, and stereo plate space.',
   },
   PlugChop: {
     title: 'Vintage Soul Record Chop',

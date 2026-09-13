@@ -16,28 +16,28 @@ const VOCAL_MODULES: PluginModule[] = [
   {
     id: 'plugtne',
     name: 'PLUGTNE v1.0.3',
-    role: 'Pitch Snap & AutoTune (F Minor)',
-    dspDetail: '0ms Retune Speed • Formant Lock',
+    role: 'Travis Scott Hard AutoTune (F Minor)',
+    dspDetail: '0ms Retune Speed • Rigid Scale Snap',
     color: 'cyan',
+  },
+  {
+    id: 'plugrack',
+    name: 'PLUGRACK',
+    role: 'Cactus Crisp Vocal Exciter & Sizzle',
+    dspDetail: '12kHz Tube Tape Heat • Dynamic Air Sizzle',
+    color: 'amber',
   },
   {
     id: 'plugvox',
     name: 'PLUGVOX',
-    role: 'RVox Leveler & Dynamics',
-    dspDetail: '40:1 Soft-Knee • 0.1ms Optical Clamp',
+    role: 'RVox 40:1 Slam Dynamics Leveler',
+    dspDetail: '0.8ms Optical Clamp • +4.5dB Makeup',
     color: 'rose',
-  },
-  {
-    id: 'plugeq',
-    name: 'PLUGEQ',
-    role: 'Pultec 12kHz Air Sheen',
-    dspDetail: '+4.5dB High Shelf • 90Hz High-Pass',
-    color: 'amber',
   },
   {
     id: 'plugverb',
     name: 'PLUGVERB',
-    role: 'Stereo Plate Reverb Space',
+    role: 'Stereo Plate Ambient Space',
     dspDetail: '1.8s Decay • 25ms Pre-Delay',
     color: 'purple',
   },
@@ -48,7 +48,13 @@ const TRACK_AUDIO_MAP: Record<string, { dry: string; wet: string; tuned?: string
     dry: '/audio/vocal_dry.wav',
     wet: '/audio/vocal_wet.wav',
     tuned: '/audio/vocal_tuned.wav',
-    dspSpecs: ['Key: F Minor', 'PLUGTNE 0ms Hard Tune', 'PLUGVOX 40:1 Leveling', 'PLUGEQ Air Sheen', 'PLUGVERB Stereo Space'],
+    dspSpecs: [
+      'Key: F Minor',
+      'Travis Scott 0ms Hard-Tune',
+      'PLUGRACK Cactus Crisp Sheen',
+      'PLUGVOX 40:1 NYC Slam',
+      'PLUGVERB Plate Space'
+    ],
     bpm: '140 BPM',
     key: 'F Minor',
   },
@@ -79,8 +85,8 @@ export const AudioDemoPlayer: React.FC = () => {
   // Per-plugin toggles for modular vocal chain
   const [activeModules, setActiveModules] = useState<Record<string, boolean>>({
     plugtne: true,
+    plugrack: true,
     plugvox: true,
-    plugeq: true,
     plugverb: true,
   });
 
@@ -140,9 +146,9 @@ export const AudioDemoPlayer: React.FC = () => {
     }
 
     // Vocal track: Handle granular plugin toggles
-    const { plugtne, plugvox, plugeq, plugverb } = activeModules;
+    const { plugtne, plugrack, plugvox, plugverb } = activeModules;
 
-    if (!plugtne && !plugvox && !plugeq && !plugverb) {
+    if (!plugtne && !plugrack && !plugvox && !plugverb) {
       // All Bypassed -> 100% Raw Mic
       if (dryAudioRef.current) {
         dryAudioRef.current.muted = isMuted;
@@ -150,16 +156,16 @@ export const AudioDemoPlayer: React.FC = () => {
       }
       if (tunedAudioRef.current) tunedAudioRef.current.muted = true;
       if (wetAudioRef.current) wetAudioRef.current.muted = true;
-    } else if (plugtne && plugvox && plugeq && plugverb) {
-      // Full Flagship Chain
+    } else if (plugtne && plugrack && plugvox && plugverb) {
+      // Full Flagship Travis Scott + PLUGRACK Cactus Crisp Chain
       if (wetAudioRef.current) {
         wetAudioRef.current.muted = isMuted;
         wetAudioRef.current.volume = effVol;
       }
       if (dryAudioRef.current) dryAudioRef.current.muted = true;
       if (tunedAudioRef.current) tunedAudioRef.current.muted = true;
-    } else if (plugtne && !plugvox && !plugeq && !plugverb) {
-      // Only AutoTune is active!
+    } else if (plugtne && !plugrack && !plugvox && !plugverb) {
+      // Only Travis Scott 0ms AutoTune is active!
       if (tunedAudioRef.current) {
         tunedAudioRef.current.muted = isMuted;
         tunedAudioRef.current.volume = effVol;
@@ -170,7 +176,7 @@ export const AudioDemoPlayer: React.FC = () => {
       // Partial chain: Blend tuned vs full wet
       if (wetAudioRef.current) {
         wetAudioRef.current.muted = isMuted;
-        wetAudioRef.current.volume = effVol * (plugverb ? 0.95 : 0.85);
+        wetAudioRef.current.volume = effVol * (plugrack ? 1.0 : 0.86);
       }
       if (dryAudioRef.current) dryAudioRef.current.muted = true;
       if (tunedAudioRef.current) tunedAudioRef.current.muted = true;
@@ -216,8 +222,8 @@ export const AudioDemoPlayer: React.FC = () => {
   const bypassAllModules = () => {
     setActiveModules({
       plugtne: false,
+      plugrack: false,
       plugvox: false,
-      plugeq: false,
       plugverb: false,
     });
   };
@@ -225,8 +231,8 @@ export const AudioDemoPlayer: React.FC = () => {
   const activateAllModules = () => {
     setActiveModules({
       plugtne: true,
+      plugrack: true,
       plugvox: true,
-      plugeq: true,
       plugverb: true,
     });
   };
@@ -321,7 +327,7 @@ export const AudioDemoPlayer: React.FC = () => {
             Hear The Commercial Difference
           </h2>
           <p className="text-sm sm:text-base text-slate-300">
-            Recorded directly on Dylan&apos;s desktop studio mic in <strong>F Minor</strong>. Toggle individual plugins (AutoTune, RVox, Air EQ, Reverb) on/off in real time to isolate what each plugin does.
+            Recorded directly on Dylan&apos;s desktop studio mic in <strong>F Minor</strong>. Experience the <strong>Travis Scott 0ms hard-tune snap</strong> and the <strong>PLUGRACK Cactus Crisp</strong> vocal preset. Toggle individual plugins on/off in real time to isolate what each plugin does.
           </p>
         </div>
 
