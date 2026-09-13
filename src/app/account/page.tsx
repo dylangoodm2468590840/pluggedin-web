@@ -64,6 +64,7 @@ export default function AccountPage() {
   const [copiedKey, setCopiedKey] = useState(false);
   const [pendingBuyItem, setPendingBuyItem] = useState<{ id: string; name: string; price: string } | null>(null);
   const [deactivatingMachine, setDeactivatingMachine] = useState<string | null>(null);
+  const [activatingCurrentDevice, setActivatingCurrentDevice] = useState(false);
   const [deviceActionMessage, setDeviceActionMessage] = useState<string | null>(null);
 
   // Check existing session from server or URL params on mount
@@ -292,6 +293,54 @@ export default function AccountPage() {
     }
   };
 
+  const handleActivateCurrentDevice = async () => {
+    setActivatingCurrentDevice(true);
+    setDeviceActionMessage(null);
+    try {
+      const isMac = typeof window !== 'undefined' && (navigator.platform.includes('Mac') || navigator.userAgent.includes('Macintosh'));
+      const isWin = typeof window !== 'undefined' && (navigator.platform.includes('Win') || navigator.userAgent.includes('Windows'));
+      const hostname = isMac ? "Dylan's MacBook" : isWin ? "DYLANNN" : "Studio Computer";
+      const platform = isMac ? "darwin" : isWin ? "win32" : "linux";
+      const machineId = isMac ? "macbook-pro-dylan-m3" : "a55d1832-4c22-4a3a-bac6-ea830712b1d0";
+
+      const res = await fetch('/api/devices/activate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          machineId,
+          hostname,
+          platform,
+          osVersion: isMac ? 'macOS Sonoma' : 'Windows 11',
+        }),
+      });
+
+      const data = await res.json();
+      if (data.success && data.user) {
+        setCurrentUser(data.user);
+        localStorage.setItem('pluggedin_web_user', JSON.stringify(data.user));
+        setDeviceActionMessage(`Successfully authorized ${hostname}! Slot ${data.machineCount} of ${data.maxDevices} active.`);
+
+        if (data.licensePayload) {
+          const blob = new Blob([JSON.stringify(data.licensePayload, null, 2)], { type: 'application/json' });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = 'license.lic';
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          URL.revokeObjectURL(url);
+        }
+      } else {
+        setDeviceActionMessage(data.error || 'Failed to authorize this computer.');
+      }
+    } catch {
+      setDeviceActionMessage('Network error while activating device.');
+    } finally {
+      setActivatingCurrentDevice(false);
+    }
+  };
+
   return (
     <div className="py-16 max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 min-h-[75vh]">
       <div className="text-center max-w-xl mx-auto mb-10 space-y-2">
@@ -443,7 +492,16 @@ export default function AccountPage() {
                 </p>
               </div>
 
-              <div className="flex items-center space-x-2">
+              <div className="flex flex-wrap items-center gap-3">
+                <button
+                  onClick={handleActivateCurrentDevice}
+                  disabled={activatingCurrentDevice}
+                  className="px-3.5 py-2 rounded-2xl bg-gradient-to-r from-emerald-400 to-cyber-cyan text-black font-extrabold text-xs shadow-glow-cyan hover:brightness-110 transition-all flex items-center space-x-1.5 disabled:opacity-50"
+                  title="Authorize this computer and download hardware license"
+                >
+                  <Sparkles className="w-3.5 h-3.5" />
+                  <span>{activatingCurrentDevice ? 'Authorizing...' : '⚡ Activate This Device'}</span>
+                </button>
                 <div className="px-4 py-2 rounded-2xl bg-studio-950 border border-white/10 flex items-center space-x-2">
                   <Laptop className="w-4 h-4 text-cyber-cyan" />
                   <span className="text-xs font-black text-white">

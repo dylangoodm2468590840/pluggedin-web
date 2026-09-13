@@ -1,8 +1,8 @@
 [
   {
     "id": "usr_founder_001",
-    "email": "dylan@pluggedin.studio",
-    "displayName": "Dylan (Founder)",
+    "email": "dylangoodm@gmail.com",
+    "displayName": "Dylan",
     "passwordHash": "84dd415c490d6615cd51ccee1e40ab67c1c34a3fc4b7b0d293e21fac995c497eb066e75ee86b37da38ef6bc43fc30b3d935cba142128254d31e84cd7e29e93b4",
     "salt": "59acff29540646fa377bee6064a08ac9",
     "tier": "All-Access Studio Pass",
@@ -13,69 +13,29 @@
     ],
     "licenseKey": "PLUG-VIP-9999-STUDIO",
     "authorizedMachines": [
-      "DESKTOP-STUDIO-MAIN",
-      "MACBOOK-PRO-M3"
+      "DYLANNN",
+      "DYLAN-STUDIO-RIG"
+    ],
+    "maxDevices": 5,
+    "machines": [
+      {
+        "machineId": "a55d1832-4c22-4a3a-bac6-ea830712b1d0",
+        "hostname": "DYLANNN",
+        "platform": "win32",
+        "osVersion": "Windows 11",
+        "activatedAt": "2026-09-13T23:42:10.746Z",
+        "lastSeenAt": "2026-09-13T23:42:10.746Z"
+      },
+      {
+        "machineId": "dylan-studio-rig-win11",
+        "hostname": "DYLAN-STUDIO-RIG",
+        "platform": "win32",
+        "osVersion": "Windows 11 Pro",
+        "activatedAt": "2026-09-13T23:55:00.000Z",
+        "lastSeenAt": "2026-09-13T23:55:00.000Z"
+      }
     ],
     "createdAt": "2026-09-13T22:01:10.072Z",
-    "lastLoginAt": "2026-09-13T22:01:10.073Z"
-  },
-  {
-    "id": "usr_061e4a2e516d",
-    "email": "testproducer@hitmakers.com",
-    "displayName": "Metro Tester",
-    "passwordHash": "6ce059635eaa6ce22e82a4f32dc0950ae3625d6b1b507927aee5a86615d849ed85d279c9f6ee63be8c4679052dbd0668772c0ed58e85994c023e2ef49c411baf",
-    "salt": "f139eba439b3a3f01c3f97898af19e21",
-    "tier": "All-Access Studio Pass",
-    "isLifetimeVIP": false,
-    "subscriptionStatus": "active",
-    "ownedPlugins": [
-      "ALL_15_PLUGINS"
-    ],
-    "licenseKey": "PLUG-32E7-F963-5256",
-    "authorizedMachines": [
-      "PRIMARY-STUDIO-DEVICE"
-    ],
-    "createdAt": "2026-09-13T22:01:10.080Z",
-    "lastLoginAt": "2026-09-13T22:01:10.243Z",
-    "resetToken": null,
-    "resetTokenExpiry": null
-  },
-  {
-    "id": "usr_f6cc453bb4b5",
-    "email": "test_1789340553757@pluggedin.studio",
-    "displayName": "Test Producer",
-    "passwordHash": "e34be67496f2a4cfd66772084c32ffe43aed7c699fd87799266c4438cb70bf2da0b813c5986b1867cbd98d2b2fe914132f90d4ee80dee277c047d2b1b465f4c0",
-    "salt": "829fa42cce9e7692a308ee099ac00527",
-    "tier": "All-Access Studio Pass",
-    "isLifetimeVIP": false,
-    "subscriptionStatus": "active",
-    "ownedPlugins": [
-      "ALL_15_PLUGINS"
-    ],
-    "licenseKey": "PLUG-E0A0-AE6E-80D0",
-    "authorizedMachines": [
-      "PRIMARY-STUDIO-DEVICE"
-    ],
-    "createdAt": "2026-09-13T23:02:33.822Z",
-    "lastLoginAt": "2026-09-13T23:02:33.822Z"
-  },
-  {
-    "id": "usr_56eebb605915",
-    "email": "testfriend@pluggedin.studio",
-    "displayName": "Homie Test",
-    "passwordHash": "1af292f94242e0a9ebfe399213987e33ec95545bb89f10faabae8041d30fad37fcf13e3fbdd70aeed107c698072c8012a4a0d237c7b011d961ab1ff6968d0bca",
-    "salt": "49d7d98082e787572ed1ebcb08ca1f9e",
-    "tier": "All-Access Studio Pass",
-    "isLifetimeVIP": true,
-    "subscriptionStatus": "active",
-    "ownedPlugins": [
-      "ALL_15_PLUGINS"
-    ],
-    "licenseKey": "PLUG-BD42-84F1-3043",
-    "authorizedMachines": [],
-    "createdAt": "2026-09-13T23:37:34.984Z",
-    "lastLoginAt": "2026-09-13T23:37:39.774Z",
-    "maxDevices": 5,
-    "machines": []
+    "lastLoginAt": "2026-09-13T23:42:10.746Z"
   }
 ]

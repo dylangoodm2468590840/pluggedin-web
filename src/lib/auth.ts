@@ -140,21 +140,141 @@ function getRedis(): any {
   return null;
 }
 
+export function deduplicateUsers(users: UserRecord[]): UserRecord[] {
+  const seen = new Map<string, UserRecord>();
+  let dylanLegacyMachines: MachineActivation[] = [];
+
+  for (const u of users) {
+    if (!u.email) continue;
+    const cleanEmail = u.email.trim().toLowerCase();
+
+    // Collect any machines previously registered under the old test founder email
+    if (cleanEmail === 'dylan@pluggedin.studio') {
+      if (Array.isArray(u.machines)) {
+        dylanLegacyMachines.push(...u.machines);
+      }
+      continue; // Discard dylan@pluggedin.studio in favor of dylangoodm@gmail.com
+    }
+
+    // Clean out temporary test accounts
+    if (
+      cleanEmail.includes('hitmakers.com') ||
+      cleanEmail.startsWith('test_') ||
+      cleanEmail === 'testfriend@pluggedin.studio'
+    ) {
+      continue;
+    }
+
+    // Auto-promote founder Dylan account to Lifetime VIP & 5 machines
+    if (cleanEmail === 'dylangoodm@gmail.com') {
+      u.tier = 'All-Access Studio Pass';
+      u.isLifetimeVIP = true;
+      u.subscriptionStatus = 'active';
+      u.maxDevices = 5;
+      if (!u.ownedPlugins) u.ownedPlugins = [];
+      if (!u.ownedPlugins.includes('ALL_15_PLUGINS')) u.ownedPlugins.push('ALL_15_PLUGINS');
+    }
+
+    if (!seen.has(cleanEmail)) {
+      seen.set(cleanEmail, { ...u, email: cleanEmail });
+    } else {
+      // Merge duplicate records for this exact email
+      const existing = seen.get(cleanEmail)!;
+      const mergedMachines = [...(existing.machines || [])];
+      for (const m of u.machines || []) {
+        if (
+          !mergedMachines.some(
+            (em) =>
+              em.machineId.toLowerCase() === m.machineId.toLowerCase() ||
+              em.hostname.toLowerCase() === m.hostname.toLowerCase()
+          )
+        ) {
+          mergedMachines.push(m);
+        }
+      }
+      existing.machines = mergedMachines;
+      existing.authorizedMachines = mergedMachines.map((m) => m.hostname);
+      if (u.isLifetimeVIP || existing.isLifetimeVIP) {
+        existing.isLifetimeVIP = true;
+        existing.tier = 'All-Access Studio Pass';
+        existing.subscriptionStatus = 'active';
+        existing.maxDevices = Math.max(existing.maxDevices || 5, u.maxDevices || 5, 5);
+      }
+      if (u.ownedPlugins && Array.isArray(u.ownedPlugins)) {
+        for (const p of u.ownedPlugins) {
+          if (!existing.ownedPlugins.includes(p)) existing.ownedPlugins.push(p);
+        }
+      }
+      seen.set(cleanEmail, existing);
+    }
+  }
+
+  // Ensure dylangoodm@gmail.com exists and has both DYLANNN (Studio PC) and Dylan's MacBook
+  const dylanAccount = seen.get('dylangoodm@gmail.com');
+  if (dylanAccount) {
+    const now = new Date().toISOString();
+    if (!dylanAccount.machines) dylanAccount.machines = [];
+
+    // Merge any legacy machines from dylan@pluggedin.studio
+    for (const lm of dylanLegacyMachines) {
+      if (!dylanAccount.machines.some((m) => m.hostname.toLowerCase() === lm.hostname.toLowerCase() || m.machineId.toLowerCase() === lm.machineId.toLowerCase())) {
+        dylanAccount.machines.push(lm);
+      }
+    }
+
+    // Ensure Studio PC (DYLANNN) is registered
+    if (!dylanAccount.machines.some((m) => m.hostname.toLowerCase() === 'dylannn' || m.machineId === 'a55d1832-4c22-4a3a-bac6-ea830712b1d0')) {
+      dylanAccount.machines.push({
+        machineId: 'a55d1832-4c22-4a3a-bac6-ea830712b1d0',
+        hostname: 'DYLANNN',
+        platform: 'win32',
+        osVersion: 'Windows 11',
+        activatedAt: now,
+        lastSeenAt: now,
+      });
+    }
+
+    // Ensure Studio Windows PC 2 is registered
+    if (!dylanAccount.machines.some((m) => m.hostname.toLowerCase().includes('studio') || m.machineId === 'dylan-studio-rig-win11')) {
+      dylanAccount.machines.push({
+        machineId: 'dylan-studio-rig-win11',
+        hostname: 'DYLAN-STUDIO-RIG',
+        platform: 'win32',
+        osVersion: 'Windows 11 Pro',
+        activatedAt: now,
+        lastSeenAt: now,
+      });
+    }
+
+    dylanAccount.authorizedMachines = dylanAccount.machines.map((m) => m.hostname);
+    dylanAccount.isLifetimeVIP = true;
+    dylanAccount.tier = 'All-Access Studio Pass';
+    dylanAccount.subscriptionStatus = 'active';
+    dylanAccount.maxDevices = 5;
+    seen.set('dylangoodm@gmail.com', dylanAccount);
+  }
+
+  return Array.from(seen.values());
+}
+
 async function fetchCloudUsers(): Promise<UserRecord[] | null> {
   const redis = getRedis();
   if (!redis) return null;
   try {
     const data = await redis.get('pluggedin_users');
+    let loaded: UserRecord[] | null = null;
     if (Array.isArray(data) && data.length > 0) {
-      memoryUsersCache = data;
-      return data;
-    }
-    if (typeof data === 'string') {
+      loaded = data;
+    } else if (typeof data === 'string') {
       const parsed = JSON.parse(data);
       if (Array.isArray(parsed) && parsed.length > 0) {
-        memoryUsersCache = parsed;
-        return parsed;
+        loaded = parsed;
       }
+    }
+    if (loaded) {
+      const dedupled = deduplicateUsers(loaded);
+      memoryUsersCache = dedupled;
+      return dedupled;
     }
   } catch (e) {
     console.warn('Upstash get error:', e);
@@ -166,7 +286,9 @@ async function saveCloudUsers(users: UserRecord[]): Promise<void> {
   const redis = getRedis();
   if (!redis) return;
   try {
-    await redis.set('pluggedin_users', users);
+    const dedupled = deduplicateUsers(users);
+    memoryUsersCache = dedupled;
+    await redis.set('pluggedin_users', dedupled);
   } catch (e) {
     console.warn('Upstash set error:', e);
   }
