@@ -1,5 +1,26 @@
 import { PluginData, DemoTrack } from '../types';
 
+export const getPluginImageUrl = (id: string): string => {
+  const map: Record<string, string> = {
+    PlugChop: '/images/plugins/plugchop.png',
+    PLUGTNE: '/images/plugins/plugtne.png',
+    UNDERGRND: '/images/plugins/undergrnd.png',
+    pluggedin_plugged1: '/images/plugins/pluggedin_plugged1.png',
+    pluggedin_plugvox: '/images/plugins/pluggedin_plugvox.png',
+    pluggedin_plugopto: '/images/plugins/pluggedin_plugopto.png',
+    pluggedin_plugglue: '/images/plugins/pluggedin_plugglue.png',
+    pluggedin_plugeq: '/images/plugins/pluggedin_plugeq.png',
+    PlugLimit: '/images/plugins/pluglimit.png',
+    PlugDelay: '/images/plugins/plugdelay.png',
+    PlugVerb: '/images/plugins/plugverb.png',
+    PlugRack: '/images/plugins/plugrack.png',
+    PlugSilky: '/images/plugins/plugsilky.png',
+    PlugBlue: '/images/plugins/plugblue.png',
+    PlugWarp: '/images/plugins/plugwarp.png',
+  };
+  return map[id] || `/images/plugins/${id.toLowerCase()}.png`;
+};
+
 export const PLUGINS_DATA: PluginData[] = [
   {
     id: 'PlugChop',

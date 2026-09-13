@@ -13,6 +13,7 @@ export interface PluginData {
   featured?: boolean;
   accentColor: 'cyan' | 'purple' | 'rose' | 'amber' | 'emerald' | 'blue';
   formats: string[];
+  imageUrl?: string;
   downloadWinUrl?: string;
   downloadMacUrl?: string;
 }

@@ -114,11 +114,11 @@ export const Hero: React.FC = () => {
                     <p className="text-xs text-slate-400 mt-1">16-Pad playable slicing MPC workstation with choke groups & auto-transient detection.</p>
                     
                     {/* Authentic Hardware GUI Screenshot */}
-                    <Link href="/plugins/PlugChop" className="my-4 block rounded-xl overflow-hidden border border-amber-500/20 bg-black/40 aspect-[16/10] relative group-hover:border-amber-500/40 transition-all">
+                    <Link href="/plugins/PlugChop" className="my-4 block rounded-xl overflow-hidden border border-amber-500/20 bg-black/60 aspect-[16/10] relative group-hover:border-amber-500/40 transition-all flex items-center justify-center p-1.5">
                       <img
-                        src="/images/plugins/PlugChop.png"
+                        src="/images/plugins/plugchop.png"
                         alt="PLUGCHOP 2.0 Real Interface"
-                        className="w-full h-full object-cover object-top group-hover:scale-105 transition-transform duration-500"
+                        className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-500"
                       />
                       <span className="absolute bottom-2 right-2 text-[9px] font-mono font-bold bg-black/80 backdrop-blur-sm text-amber-400 border border-amber-500/30 px-2 py-0.5 rounded-full">
                         REAL JUCE GUI
@@ -144,11 +144,11 @@ export const Hero: React.FC = () => {
                     <p className="text-xs text-slate-400 mt-1">Real-time low-latency pitch snap with dual vector oscilloscope & chromatic key scale detector.</p>
                     
                     {/* Authentic Hardware GUI Screenshot */}
-                    <Link href="/plugins/PLUGTNE" className="my-4 block rounded-xl overflow-hidden border border-cyber-cyan/20 bg-black/40 aspect-[16/10] relative group-hover:border-cyber-cyan/40 transition-all">
+                    <Link href="/plugins/PLUGTNE" className="my-4 block rounded-xl overflow-hidden border border-cyber-cyan/20 bg-black/60 aspect-[16/10] relative group-hover:border-cyber-cyan/40 transition-all flex items-center justify-center p-1.5">
                       <img
-                        src="/images/plugins/PLUGTNE.png"
+                        src="/images/plugins/plugtne.png"
                         alt="PLUGTNE Real Interface"
-                        className="w-full h-full object-cover object-top group-hover:scale-105 transition-transform duration-500"
+                        className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-500"
                       />
                       <span className="absolute bottom-2 right-2 text-[9px] font-mono font-bold bg-black/80 backdrop-blur-sm text-cyber-cyan border border-cyber-cyan/30 px-2 py-0.5 rounded-full">
                         REAL JUCE GUI
@@ -174,11 +174,11 @@ export const Hero: React.FC = () => {
                     <p className="text-xs text-slate-400 mt-1">12AX7 tube saturation, pitch formant demon warping, and sub-bass generator for aggressive trap 808s.</p>
                     
                     {/* Authentic Hardware GUI Screenshot */}
-                    <Link href="/plugins/UNDERGRND" className="my-4 block rounded-xl overflow-hidden border border-cyber-rose/20 bg-black/40 aspect-[16/10] relative group-hover:border-cyber-rose/40 transition-all">
+                    <Link href="/plugins/UNDERGRND" className="my-4 block rounded-xl overflow-hidden border border-cyber-rose/20 bg-black/60 aspect-[16/10] relative group-hover:border-cyber-rose/40 transition-all flex items-center justify-center p-1.5">
                       <img
-                        src="/images/plugins/UNDERGRND.png"
+                        src="/images/plugins/undergrnd.png"
                         alt="UNDERGRND Real Interface"
-                        className="w-full h-full object-cover object-top group-hover:scale-105 transition-transform duration-500"
+                        className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-500"
                       />
                       <span className="absolute bottom-2 right-2 text-[9px] font-mono font-bold bg-black/80 backdrop-blur-sm text-cyber-rose border border-cyber-rose/30 px-2 py-0.5 rounded-full">
                         REAL JUCE GUI

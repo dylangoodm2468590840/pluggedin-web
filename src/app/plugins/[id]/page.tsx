@@ -2,7 +2,7 @@ import React from 'react';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { Sparkles, Check, ArrowLeft, Download, ShieldCheck, Cpu, Layers } from 'lucide-react';
-import { PLUGINS_DATA } from '../../../data/plugins';
+import { PLUGINS_DATA, getPluginImageUrl } from '../../../data/plugins';
 
 export function generateStaticParams() {
   return PLUGINS_DATA.map((plugin) => ({
@@ -101,11 +101,11 @@ export default function PluginDetailPage({ params }: { params: { id: string } })
           </span>
         </div>
 
-        <div className="mt-4 rounded-2xl overflow-hidden bg-studio-950/80 border border-white/10 shadow-2xl relative">
+        <div className="mt-4 rounded-2xl overflow-hidden bg-studio-950/80 border border-white/10 shadow-2xl relative flex items-center justify-center p-2">
           <img
-            src={`/images/plugins/${plugin.id}.png`}
+            src={getPluginImageUrl(plugin.id)}
             alt={`${plugin.name} Full Faceplate Screenshot`}
-            className="w-full h-auto object-contain mx-auto"
+            className="w-full max-h-[600px] object-contain mx-auto"
           />
         </div>
       </div>
