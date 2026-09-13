@@ -9,12 +9,12 @@ interface PluginMiniPlayerProps {
 
 const PLUGIN_DEMO_MAP: Record<string, { title: string; dry: string; wet: string; dryLabel: string; wetLabel: string; desc: string }> = {
   PLUGTNE: {
-    title: 'Vocal Stem Snap Comparison',
+    title: 'F Minor Vocal Autotune Comparison',
     dry: '/audio/vocal_dry.wav',
     wet: '/audio/vocal_wet.wav',
-    dryLabel: 'Raw Studio Mic Vocal',
-    wetLabel: 'PLUGTNE 0ms AutoTune',
-    desc: 'Notice instant hard-tune snapping and pitch stabilization across vocal transients.',
+    dryLabel: 'Raw Dylan Desktop Mic',
+    wetLabel: 'PLUGTNE F Minor AutoTune',
+    desc: 'Notice instant hard-tune snapping in F Minor and pitch stabilization across vocal transients.',
   },
   PlugChop: {
     title: 'Vintage Soul Record Chop',
@@ -33,12 +33,12 @@ const PLUGIN_DEMO_MAP: Record<string, { title: string; dry: string; wet: string;
     desc: 'Asymmetric triode tube saturation that cuts through smartphone speakers while rumbling subs.',
   },
   pluggedin_plugged1: {
-    title: 'Sub-808 Engine & BeaterKnock',
+    title: 'PLUGGED 1 Hard Knock 808 Preset',
     dry: '/audio/808_dry.wav',
-    wet: '/audio/808_wet.wav',
-    dryLabel: 'Dry Synth Sub',
-    wetLabel: 'PLUGGED 1 Hardware Cut',
-    desc: 'Sub808Engine pitch drop envelope, Anti-Squeak zero-crossing phase alignment, and analog drive.',
+    wet: '/audio/preset_808_hardknock.wav',
+    dryLabel: 'Basic Sine Sub',
+    wetLabel: 'Hard Knock 808 (Hit)',
+    desc: 'Flagship Sub808Engine pitch dive, woody beater knock, Anti-Squeak zero-crossing, and asymmetric tube mids.',
   },
   pluggedin_plugvox: {
     title: 'RVox-Style Vocal Dynamics',

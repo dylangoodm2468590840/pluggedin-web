@@ -150,7 +150,7 @@ export const Hero: React.FC = () => {
                       <span className="text-xs font-mono text-slate-400">DEV-1079</span>
                     </div>
                     <h3 className="text-lg font-black text-white mt-3">PLUGTNE v1.0.3</h3>
-                    <p className="text-xs text-slate-400 mt-1">Real-time low-latency pitch snap with dual vector oscilloscope & chromatic key scale detector.</p>
+                    <p className="text-xs text-slate-400 mt-1">Real-time low-latency pitch snap in F Minor with dual vector oscilloscope & chromatic scale lock.</p>
                     
                     {/* Authentic Hardware GUI Screenshot */}
                     <Link href="/plugins/PLUGTNE" className="my-4 block rounded-xl overflow-hidden border border-cyber-cyan/20 bg-black/60 aspect-[16/10] relative group-hover:border-cyber-cyan/40 transition-all flex items-center justify-center p-1.5">
@@ -174,7 +174,7 @@ export const Hero: React.FC = () => {
                       className="px-3 py-1.5 rounded-lg bg-cyber-cyan/15 hover:bg-cyber-cyan/25 text-cyber-cyan font-bold text-xs border border-cyber-cyan/30 flex items-center space-x-1.5 transition-all shadow-glow-cyan"
                     >
                       <Play className="w-3 h-3 fill-current" />
-                      <span>Audition Tone</span>
+                      <span>Audition F Minor Vocal</span>
                     </a>
                   </div>
                 </div>

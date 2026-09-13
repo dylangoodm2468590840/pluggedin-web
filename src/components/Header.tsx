@@ -31,6 +31,10 @@ export const Header: React.FC = () => {
           <Link href="/#plugins" className="hover:text-cyber-cyan transition-colors">
             Plugins Catalog
           </Link>
+          <Link href="/#sound-explorer" className="hover:text-cyber-cyan transition-colors flex items-center space-x-1.5">
+            <Sparkles className="w-3.5 h-3.5 text-cyber-cyan" />
+            <span>Sound Bank</span>
+          </Link>
           <Link href="/pricing" className="hover:text-cyber-purple transition-colors flex items-center space-x-1.5">
             <Sparkles className="w-4 h-4 text-cyber-purple" />
             <span>All-Access Pass</span>
@@ -90,6 +94,13 @@ export const Header: React.FC = () => {
             className="block text-base font-semibold text-slate-200 hover:text-cyber-cyan"
           >
             Plugins Catalog
+          </Link>
+          <Link
+            href="/#sound-explorer"
+            onClick={() => setMobileMenuOpen(false)}
+            className="block text-base font-semibold text-cyber-cyan"
+          >
+            PLUGGED 1 Sound Bank
           </Link>
           <Link
             href="/pricing"

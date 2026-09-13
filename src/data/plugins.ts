@@ -350,12 +350,12 @@ export const PLUGINS_DATA: PluginData[] = [
 export const DEMO_TRACKS: DemoTrack[] = [
   {
     id: 'trap_vocal',
-    title: 'Modern Trap Lead Vocal',
-    genre: 'Melodic Trap',
-    pluginUsed: 'PLUGTNE v1.0 + PLUGVOX',
-    description: 'Hear raw bedroom studio vocals snap into billboard-ready pitch accuracy with polished dynamics and warmth.',
-    dryLabel: 'Raw Mic Input',
-    wetLabel: 'PluggedIN Vocal Chain'
+    title: 'Lead Vocal Chain (Dylan Desktop Stem)',
+    genre: 'Melodic Trap • F Minor',
+    pluginUsed: 'PLUGTNE + PLUGVOX + PLUGEQ + PLUGVERB',
+    description: 'Direct from Dylan\'s desktop microphone in F Minor. Toggle individual plugins (AutoTune, RVox Leveler, Air EQ, Reverb) on/off in real time to isolate what each plugin does.',
+    dryLabel: 'Raw Desktop Mic (Bypass All)',
+    wetLabel: 'Full Flagship Vocal Chain'
   },
   {
     id: 'hiphop_sample',
