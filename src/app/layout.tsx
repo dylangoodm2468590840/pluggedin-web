@@ -17,6 +17,10 @@ export const metadata: Metadata = {
   description: '15 flagship audio production plugins for FL Studio, Pro Tools, Logic Pro, and Ableton. Featuring PlugChop 16-Pad Sampler, PLUGTNE AutoTune, and Underground Analog Saturation.',
   keywords: ['audio plugins', 'vst3', 'au', 'autotune', 'sampler', 'mpc', 'fl studio', 'logic pro', 'pro tools', 'plugtune', 'plugchop', 'slate digital', 'waves'],
   manifest: '/manifest.json',
+  icons: {
+    icon: '/images/plugins/plugged1.png',
+    apple: '/images/plugins/plugged1.png',
+  },
   appleWebApp: {
     capable: true,
     statusBarStyle: 'black-translucent',
