@@ -775,6 +775,7 @@ export interface OrderRecord {
   currency: string;
   status: 'completed' | 'refunded' | 'disputed';
   createdAt: string;
+  isTest?: boolean;
 }
 
 export async function fetchOrders(): Promise<OrderRecord[]> {
@@ -814,6 +815,67 @@ export async function saveOrderRecord(order: OrderRecord): Promise<void> {
   }
 }
 
+export async function purgeTestOrders(): Promise<{ removedCount: number; remainingCount: number }> {
+  const redis = getRedis();
+  const currentOrders = await fetchOrders();
+  const filtered = currentOrders.filter(
+    (o) => !o.isTest && !o.paypalOrderId?.startsWith('PAYPAL-TEST-') && !o.id?.startsWith('ord_test_')
+  );
+  const removed = currentOrders.length - filtered.length;
+
+  if (redis) {
+    try {
+      await redis.set('pluggedin_orders', filtered);
+    } catch (e) {
+      console.warn('Error purging test orders from Upstash:', e);
+    }
+  }
+
+  return { removedCount: removed, remainingCount: filtered.length };
+}
+
+export interface JarvisDispatch {
+  id: string;
+  type: 'bug' | 'optimization' | 'strategic_proposal' | 'security_alert';
+  priority: 'critical' | 'high' | 'medium' | 'low';
+  title: string;
+  details: string;
+  suggestedAction: string;
+  status: 'open' | 'addressed' | 'resolved';
+  createdAt: string;
+}
+
+export async function fetchJarvisDispatches(): Promise<JarvisDispatch[]> {
+  const redis = getRedis();
+  if (redis) {
+    try {
+      const data = await redis.get('pluggedin_jarvis_dispatches');
+      if (Array.isArray(data)) return data;
+      if (typeof data === 'string') {
+        try {
+          return JSON.parse(data);
+        } catch {}
+      }
+    } catch (e) {
+      console.warn('Error fetching Jarvis dispatches from Upstash:', e);
+    }
+  }
+  return [];
+}
+
+export async function recordJarvisDispatch(dispatch: JarvisDispatch): Promise<void> {
+  const redis = getRedis();
+  const current = await fetchJarvisDispatches();
+  current.unshift(dispatch);
+  if (redis) {
+    try {
+      await redis.set('pluggedin_jarvis_dispatches', current.slice(0, 50));
+    } catch (e) {
+      console.warn('Error recording Jarvis dispatch to Upstash:', e);
+    }
+  }
+}
+
 export async function resetAllUserMachines(userId: string): Promise<UserSafeProfile> {
   const cloudUsers = await fetchCloudUsers();
   const users = cloudUsers || readUsers();
@@ -846,6 +908,7 @@ export async function revokeUserAccess(userId: string): Promise<UserSafeProfile>
   await saveCloudUsers(users);
   return toSafeProfile(user);
 }
+
 
 
 

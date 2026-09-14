@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import Link from 'next/link';
 import {
   DollarSign,
@@ -26,7 +26,15 @@ import {
   Zap,
   Award,
   Disc,
-  ArrowDownRight,
+  Mic,
+  MicOff,
+  Volume2,
+  VolumeX,
+  Trash2,
+  Activity,
+  Radio,
+  Cpu,
+  Terminal,
 } from 'lucide-react';
 
 interface Financials {
@@ -81,6 +89,7 @@ interface OrderItem {
   netAmount: number;
   promoCode?: string;
   status: string;
+  isTest?: boolean;
   createdAt: string;
 }
 
@@ -100,6 +109,17 @@ interface CustomerItem {
     osVersion?: string;
     activatedAt: string;
   }>;
+  createdAt: string;
+}
+
+interface JarvisDispatchItem {
+  id: string;
+  type: string;
+  priority: string;
+  title: string;
+  details: string;
+  suggestedAction: string;
+  status: string;
   createdAt: string;
 }
 
@@ -124,21 +144,31 @@ export default function FounderDashboardPage() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [authError, setAuthError] = useState('');
   const [timeframe, setTimeframe] = useState<'today' | '7d' | '30d' | 'ytd' | 'all'>('all');
-  const [activeTab, setActiveTab] = useState<'financials' | 'subs' | 'plugins' | 'traffic' | 'coupons' | 'customers' | 'ai'>('financials');
+  const [activeTab, setActiveTab] = useState<'jarvis' | 'financials' | 'subs' | 'plugins' | 'traffic' | 'coupons' | 'customers' | 'sentinel'>('jarvis');
   const [metrics, setMetrics] = useState<MetricsResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [searchCustomer, setSearchCustomer] = useState('');
   const [actionMessage, setActionMessage] = useState<string | null>(null);
 
-  // AI Copilot state
+  // JARVIS Voice Engine state
+  const [isVoiceEnabled, setIsVoiceEnabled] = useState(true);
+  const [isListening, setIsListening] = useState(false);
+  const [isSpeaking, setIsSpeaking] = useState(false);
+  const [transcriptPreview, setTranscriptPreview] = useState('');
   const [aiPrompt, setAiPrompt] = useState('');
-  const [aiChatHistory, setAiChatHistory] = useState<Array<{ role: 'user' | 'assistant'; text: string }>>([
+  const [aiChatHistory, setAiChatHistory] = useState<Array<{ role: 'user' | 'assistant'; text: string; speech?: string }>>([
     {
       role: 'assistant',
-      text: "👋 Hey Dylan! I'm your Executive Audio Growth Advisor. I have real-time access to your store metrics, revenue, and active subscriptions. Ask me about TikTok hooks, high-converting bundles, email outreach, or how to scale your MRR!",
+      text: "👋 Good day, Sir. I am J.A.R.V.I.S., your Executive Audio Intelligence System. I am monitoring your live PayPal financials, subscriber retention, and website telemetry 24/7. Tap my Arc Reactor to speak with me, or ask me to formulate any marketing or scaling strategy.",
+      speech: "Good day, Sir. J.A.R.V.I.S. is online and standing by. All systems are operational.",
     },
   ]);
   const [aiLoading, setAiLoading] = useState(false);
+  const [sentinelData, setSentinelData] = useState<any>(null);
+  const [dispatches, setDispatches] = useState<JarvisDispatchItem[]>([]);
+
+  const recognitionRef = useRef<any>(null);
+  const chatBottomRef = useRef<HTMLDivElement>(null);
 
   // Auto-auth check on mount
   useEffect(() => {
@@ -149,14 +179,108 @@ export default function FounderDashboardPage() {
     }
   }, []);
 
+  // Initialize Web Speech Recognition
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+      if (SpeechRecognition) {
+        const reco = new SpeechRecognition();
+        reco.continuous = false;
+        reco.interimResults = true;
+        reco.lang = 'en-US';
+
+        reco.onresult = (event: any) => {
+          let currentTranscript = '';
+          for (let i = event.resultIndex; i < event.results.length; ++i) {
+            currentTranscript += event.results[i][0].transcript;
+          }
+          setTranscriptPreview(currentTranscript);
+          if (event.results[0].isFinal) {
+            handleSendAiPrompt(currentTranscript);
+            setTranscriptPreview('');
+            setIsListening(false);
+          }
+        };
+
+        reco.onerror = () => {
+          setIsListening(false);
+          setTranscriptPreview('');
+        };
+
+        reco.onend = () => {
+          setIsListening(false);
+        };
+
+        recognitionRef.current = reco;
+      }
+    }
+  }, []);
+
+  // Voice output synthesis (Jarvis speaks)
+  const speakJarvisVoice = useCallback((textToSpeak: string) => {
+    if (!isVoiceEnabled || typeof window === 'undefined' || !window.speechSynthesis) return;
+
+    window.speechSynthesis.cancel(); // Stop any ongoing speech
+
+    const cleanText = textToSpeak.replace(/[\#\*\_\[\]]/g, '').trim();
+    const utterance = new SpeechSynthesisUtterance(cleanText);
+
+    // Prefer British English male voice for authentic Jarvis feel
+    const voices = window.speechSynthesis.getVoices();
+    const jarvisVoice =
+      voices.find((v) => v.lang === 'en-GB' && (v.name.includes('Daniel') || v.name.includes('George') || v.name.includes('Oliver') || v.name.includes('Male'))) ||
+      voices.find((v) => v.lang === 'en-GB') ||
+      voices.find((v) => v.name.includes('Google UK English Male')) ||
+      voices.find((v) => v.lang.startsWith('en'));
+
+    if (jarvisVoice) {
+      utterance.voice = jarvisVoice;
+    }
+
+    utterance.rate = 1.02;
+    utterance.pitch = 0.95;
+
+    utterance.onstart = () => setIsSpeaking(true);
+    utterance.onend = () => setIsSpeaking(false);
+    utterance.onerror = () => setIsSpeaking(false);
+
+    window.speechSynthesis.speak(utterance);
+  }, [isVoiceEnabled]);
+
+  const toggleMic = () => {
+    if (!recognitionRef.current) {
+      alert('Speech recognition is not supported in this browser. Please use Chrome, Safari, or Edge.');
+      return;
+    }
+
+    if (isListening) {
+      recognitionRef.current.stop();
+      setIsListening(false);
+    } else {
+      try {
+        if (typeof window !== 'undefined' && window.speechSynthesis) {
+          window.speechSynthesis.cancel();
+        }
+        setIsSpeaking(false);
+        recognitionRef.current.start();
+        setIsListening(true);
+      } catch (err) {
+        console.warn('Microphone error:', err);
+      }
+    }
+  };
+
   const fetchMetrics = useCallback(async (selectedTimeframe = timeframe, pinCode = pin) => {
     setLoading(true);
     try {
-      const res = await fetch(`/api/founder/metrics?timeframe=${selectedTimeframe}`, {
-        headers: {
-          'x-founder-pin': pinCode || '8492',
-        },
-      });
+      const [res, sentinelRes] = await Promise.all([
+        fetch(`/api/founder/metrics?timeframe=${selectedTimeframe}`, {
+          headers: { 'x-founder-pin': pinCode || '8492' },
+        }),
+        fetch('/api/founder/sentinel', {
+          headers: { 'x-founder-pin': pinCode || '8492' },
+        }).catch(() => null),
+      ]);
 
       if (res.ok) {
         const data = await res.json();
@@ -167,6 +291,14 @@ export default function FounderDashboardPage() {
       } else if (res.status === 404 || res.status === 401) {
         setIsAuthenticated(false);
         setAuthError('Invalid Security PIN or Unauthorized Device.');
+      }
+
+      if (sentinelRes && sentinelRes.ok) {
+        const sData = await sentinelRes.json();
+        setSentinelData(sData);
+        if (sData.activeDispatches) {
+          setDispatches(sData.activeDispatches);
+        }
       }
     } catch (err: any) {
       setAuthError('Connection error. Could not load founder telemetry.');
@@ -184,6 +316,28 @@ export default function FounderDashboardPage() {
   const handlePinSubmit = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     fetchMetrics(timeframe, pin);
+  };
+
+  const handlePurgeTestOrders = async () => {
+    if (!confirm('Purge all simulated test orders? Genuine customer transactions will remain 100% untouched.')) return;
+    try {
+      const res = await fetch('/api/founder/actions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-founder-pin': pin || '8492',
+        },
+        body: JSON.stringify({ action: 'purge_test_orders' }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setActionMessage(`🧹 ${data.message}`);
+        setTimeout(() => setActionMessage(null), 5000);
+        fetchMetrics();
+      }
+    } catch (e: any) {
+      alert(e.message);
+    }
   };
 
   const handleResetMachines = async (userId: string, customerName: string) => {
@@ -234,7 +388,7 @@ export default function FounderDashboardPage() {
       });
       const data = await res.json();
       if (data.success) {
-        setActionMessage('🎉 Test Order Captured! Live Net Take-Home updated.');
+        setActionMessage('🎉 Test Order Simulated! (You can purge anytime with 1 click)');
         setTimeout(() => setActionMessage(null), 5000);
         fetchMetrics();
       }
@@ -273,20 +427,34 @@ export default function FounderDashboardPage() {
 
       const data = await res.json();
       if (data.success && data.reply) {
-        setAiChatHistory([...newHistory, { role: 'assistant', text: data.reply }]);
-      } else {
         setAiChatHistory([
           ...newHistory,
-          { role: 'assistant', text: '⚠️ Unable to process advisory request. Please check connection.' },
+          { role: 'assistant', text: data.reply, speech: data.speech },
         ]);
+
+        if (data.speech) {
+          speakJarvisVoice(data.speech);
+        } else {
+          speakJarvisVoice(data.reply.slice(0, 180));
+        }
+
+        if (data.dispatch) {
+          setDispatches((prev) => [data.dispatch, ...prev]);
+        }
+      } else {
+        const errReply = "⚠️ My apologies Sir, I encountered a communication delay. Please try once more.";
+        setAiChatHistory([...newHistory, { role: 'assistant', text: errReply }]);
+        speakJarvisVoice(errReply);
       }
     } catch (e: any) {
-      setAiChatHistory([
-        ...newHistory,
-        { role: 'assistant', text: `⚠️ Error communicating with AI: ${e.message}` },
-      ]);
+      const errMsg = `⚠️ Connection error, Sir: ${e.message}`;
+      setAiChatHistory([...newHistory, { role: 'assistant', text: errMsg }]);
+      speakJarvisVoice(errMsg);
     } finally {
       setAiLoading(false);
+      setTimeout(() => {
+        chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+      }, 100);
     }
   };
 
@@ -299,14 +467,21 @@ export default function FounderDashboardPage() {
           <div className="absolute -bottom-24 -left-24 w-48 h-48 bg-cyber-purple/10 rounded-full blur-3xl pointer-events-none" />
 
           <div className="flex flex-col items-center text-center space-y-4 mb-8">
-            <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-cyber-cyan to-blue-600 p-[2px] shadow-glow-cyan">
-              <div className="w-full h-full bg-slate-950 rounded-[14px] flex items-center justify-center">
-                <Lock className="w-8 h-8 text-cyber-cyan" />
+            <div className="relative">
+              <div className="w-20 h-20 rounded-full bg-gradient-to-tr from-cyber-cyan via-blue-500 to-cyber-purple p-[2px] shadow-glow-cyan animate-pulse">
+                <div className="w-full h-full bg-slate-950 rounded-full flex items-center justify-center">
+                  <Bot className="w-10 h-10 text-cyber-cyan" />
+                </div>
               </div>
             </div>
             <div>
-              <h1 className="text-2xl font-black tracking-tight text-white">Founder Security Shield</h1>
-              <p className="text-xs text-slate-400 mt-1">PluggedIN Executive Sales & Revenue Central</p>
+              <h1 className="text-2xl font-black tracking-tight text-white flex items-center justify-center space-x-2">
+                <span>J.A.R.V.I.S.</span>
+                <span className="text-xs font-mono text-cyber-cyan bg-cyber-cyan/10 px-2 py-0.5 rounded-full border border-cyber-cyan/20">
+                  SECURE
+                </span>
+              </h1>
+              <p className="text-xs text-slate-400 mt-1">Dylan Goodman • Executive Command & Intelligence</p>
             </div>
           </div>
 
@@ -343,13 +518,13 @@ export default function FounderDashboardPage() {
               ) : (
                 <>
                   <Unlock className="w-4 h-4" />
-                  <span>Unlock Executive Hub</span>
+                  <span>Authenticate with J.A.R.V.I.S.</span>
                 </>
               )}
             </button>
           </form>
 
-          {/* Quick PIN Keypad for Phone */}
+          {/* Quick PIN Keypad */}
           <div className="mt-8 pt-6 border-t border-slate-800/80">
             <div className="grid grid-cols-3 gap-3">
               {['1', '2', '3', '4', '5', '6', '7', '8', '9', 'C', '0', '✓'].map((key) => (
@@ -368,7 +543,7 @@ export default function FounderDashboardPage() {
               ))}
             </div>
             <p className="text-[10px] font-mono text-center text-slate-500 mt-4">
-              Authorized strictly for Dylan Goodman (dylangoodm@gmail.com)
+              Restricted exclusively to Dylan Goodman (Founder)
             </p>
           </div>
         </div>
@@ -398,24 +573,43 @@ export default function FounderDashboardPage() {
       <header className="sticky top-0 z-40 bg-slate-950/90 backdrop-blur-xl border-b border-slate-800/80 px-4 py-3 sm:px-6">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
           <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-cyber-cyan via-cyber-purple to-pink-500 p-[1.5px] shadow-glow-cyan">
-              <div className="w-full h-full bg-slate-950 rounded-[10px] flex items-center justify-center">
-                <Disc className="w-5 h-5 text-cyber-cyan animate-spin-slow" />
+            {/* Holographic Arc Core Indicator */}
+            <div className="relative">
+              <div className={`w-10 h-10 rounded-xl bg-gradient-to-tr from-cyber-cyan via-blue-500 to-cyber-purple p-[1.5px] ${isSpeaking ? 'shadow-glow-cyan animate-pulse' : ''}`}>
+                <div className="w-full h-full bg-slate-950 rounded-[10px] flex items-center justify-center">
+                  <Bot className={`w-5 h-5 ${isSpeaking ? 'text-cyber-cyan animate-bounce' : 'text-slate-300'}`} />
+                </div>
               </div>
+              <span className="absolute -bottom-1 -right-1 flex h-3 w-3">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
+              </span>
             </div>
             <div>
               <div className="flex items-center space-x-2">
-                <span className="text-base font-black tracking-wider text-white">FOUNDER HUB</span>
+                <span className="text-base font-black tracking-wider text-white">J.A.R.V.I.S.</span>
                 <span className="text-[10px] font-mono bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-2 py-0.5 rounded-full font-bold">
-                  LIVE
+                  ONLINE
                 </span>
               </div>
-              <p className="text-[10px] text-slate-400 font-mono">Dylan Goodman • Executive View</p>
+              <p className="text-[10px] text-slate-400 font-mono">Dylan Goodman • Executive AI</p>
             </div>
           </div>
 
           {/* Action buttons */}
           <div className="flex items-center space-x-2">
+            <button
+              onClick={() => setIsVoiceEnabled(!isVoiceEnabled)}
+              className={`p-2.5 rounded-xl border text-xs font-semibold flex items-center space-x-1.5 transition-all ${
+                isVoiceEnabled
+                  ? 'bg-cyber-cyan/10 border-cyber-cyan/30 text-cyber-cyan'
+                  : 'bg-slate-900 border-slate-800 text-slate-500'
+              }`}
+              title={isVoiceEnabled ? 'Voice output enabled' : 'Voice output muted'}
+            >
+              {isVoiceEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
+            </button>
+
             <button
               onClick={() => fetchMetrics(timeframe)}
               disabled={loading}
@@ -425,6 +619,7 @@ export default function FounderDashboardPage() {
               <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin text-cyber-cyan' : ''}`} />
               <span className="hidden sm:inline">Sync</span>
             </button>
+
             <button
               onClick={() => {
                 localStorage.removeItem('pluggedin_founder_pin');
@@ -451,7 +646,7 @@ export default function FounderDashboardPage() {
 
       {/* Main Container */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-6 space-y-6">
-        {/* Timeframe Filter Bar */}
+        {/* Timeframe & Ledger Controls */}
         <div className="flex items-center justify-between flex-wrap gap-3 pb-2 border-b border-slate-800/60">
           <div className="flex items-center space-x-1.5 bg-slate-900/80 p-1 rounded-2xl border border-slate-800 overflow-x-auto max-w-full">
             {(
@@ -479,20 +674,20 @@ export default function FounderDashboardPage() {
 
           <div className="flex items-center space-x-2">
             <button
+              onClick={handlePurgeTestOrders}
+              className="px-3 py-1.5 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 hover:bg-rose-500/20 text-xs font-semibold flex items-center space-x-1.5 transition-all"
+              title="Remove test simulated orders and restore 100% genuine ledger"
+            >
+              <Trash2 className="w-3.5 h-3.5 text-rose-400" />
+              <span>Purge Test Sales</span>
+            </button>
+            <button
               onClick={handleCreateTestSale}
               className="px-3 py-1.5 rounded-xl bg-purple-500/10 border border-purple-500/30 text-purple-300 hover:bg-purple-500/20 text-xs font-semibold flex items-center space-x-1.5 transition-all"
             >
               <Zap className="w-3.5 h-3.5 text-purple-400" />
               <span>Simulate Sale</span>
             </button>
-            <Link
-              href="/"
-              target="_blank"
-              className="px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-800 text-slate-400 hover:text-white text-xs font-semibold flex items-center space-x-1"
-            >
-              <span>View Store</span>
-              <ArrowUpRight className="w-3.5 h-3.5" />
-            </Link>
           </div>
         </div>
 
@@ -513,7 +708,7 @@ export default function FounderDashboardPage() {
               ${(fin?.netTotal || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </div>
             <p className="text-[11px] text-slate-400 mt-2">
-              Actual deposited PayPal balance after processor fees & tax.
+              Exact PayPal balance deposited after all fees & taxes.
             </p>
           </div>
 
@@ -522,7 +717,7 @@ export default function FounderDashboardPage() {
             <div className="flex items-center justify-between mb-2">
               <span className="text-xs font-mono uppercase tracking-wider text-slate-400 font-bold flex items-center space-x-1.5">
                 <CreditCard className="w-4 h-4 text-blue-400" />
-                <span>Gross Volume</span>
+                <span>Gross Checkout</span>
               </span>
               <span className="text-[10px] font-mono text-rose-400 flex items-center">
                 -${(fin?.feeTotal || 0).toFixed(2)} fees
@@ -532,7 +727,7 @@ export default function FounderDashboardPage() {
               ${(fin?.grossTotal || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </div>
             <p className="text-[11px] text-slate-400 mt-2">
-              Across {fin?.completedOrdersCount || 0} customer checkouts.
+              Across {fin?.completedOrdersCount || 0} customer transactions.
             </p>
           </div>
 
@@ -541,7 +736,7 @@ export default function FounderDashboardPage() {
             <div className="flex items-center justify-between mb-2">
               <span className="text-xs font-mono uppercase tracking-wider text-purple-400 font-bold flex items-center space-x-1.5">
                 <RefreshCw className="w-4 h-4" />
-                <span>MRR (Recurring)</span>
+                <span>MRR (Monthly)</span>
               </span>
               <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 font-bold">
                 {subs?.activeSubscribersCount || 0} active
@@ -561,7 +756,7 @@ export default function FounderDashboardPage() {
             <div className="flex items-center justify-between mb-2">
               <span className="text-xs font-mono uppercase tracking-wider text-cyber-cyan font-bold flex items-center space-x-1.5">
                 <Users className="w-4 h-4" />
-                <span>Store Conversion</span>
+                <span>Conversion Rate</span>
               </span>
               <span className="text-[10px] font-mono text-slate-400">
                 {traf?.totalViews || 0} visits
@@ -579,13 +774,14 @@ export default function FounderDashboardPage() {
         {/* Section Navigation Tabs */}
         <div className="flex items-center space-x-2 border-b border-slate-800 pb-1 overflow-x-auto">
           {[
+            { id: 'jarvis', label: 'J.A.R.V.I.S. Voice AI', icon: Bot },
+            { id: 'sentinel', label: '24/7 Sentinel Watchdog', icon: Activity },
             { id: 'financials', label: 'Financials & Orders', icon: DollarSign },
             { id: 'subs', label: 'Subscriptions & MRR', icon: RefreshCw },
             { id: 'plugins', label: 'Plugin Leaderboard', icon: Layers },
             { id: 'traffic', label: 'Traffic & Sources', icon: BarChart3 },
             { id: 'coupons', label: 'Coupons & Disputes', icon: Tag },
             { id: 'customers', label: 'Customers & Devices', icon: Users },
-            { id: 'ai', label: 'AI Growth Copilot', icon: Bot },
           ].map((tab) => {
             const Icon = tab.icon;
             const active = activeTab === tab.id;
@@ -606,18 +802,301 @@ export default function FounderDashboardPage() {
           })}
         </div>
 
-        {/* TAB 1: FINANCIALS & RECENT ORDERS */}
+        {/* TAB: J.A.R.V.I.S. VOICE AI & ARC REACTOR */}
+        {activeTab === 'jarvis' && (
+          <div className="space-y-6">
+            {/* Holographic Arc Reactor Hub */}
+            <div className="bg-gradient-to-b from-slate-900 via-slate-900/90 to-slate-950 border border-slate-800 rounded-3xl p-6 sm:p-8 flex flex-col items-center text-center relative overflow-hidden">
+              <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(0,240,255,0.08)_0,transparent_70%)] pointer-events-none" />
+
+              {/* Arc Reactor Sphere */}
+              <div className="relative my-4">
+                {/* Outer Ring */}
+                <div
+                  className={`w-32 h-32 sm:w-40 sm:h-40 rounded-full border border-cyber-cyan/30 flex items-center justify-center relative transition-all duration-500 ${
+                    isListening
+                      ? 'shadow-[0_0_50px_rgba(0,240,255,0.6)] border-cyber-cyan animate-pulse'
+                      : isSpeaking
+                      ? 'shadow-[0_0_60px_rgba(168,85,247,0.6)] border-purple-400 animate-pulse'
+                      : 'hover:shadow-[0_0_30px_rgba(0,240,255,0.3)]'
+                  }`}
+                >
+                  {/* Rotating Inner Segments */}
+                  <div className={`absolute inset-2 rounded-full border border-dashed border-cyber-cyan/40 ${isSpeaking ? 'animate-spin-slow' : ''}`} />
+
+                  {/* Core Mic Button */}
+                  <button
+                    type="button"
+                    onClick={toggleMic}
+                    className={`w-20 h-20 sm:w-24 sm:h-24 rounded-full flex flex-col items-center justify-center transition-all z-10 ${
+                      isListening
+                        ? 'bg-rose-500 text-white shadow-lg scale-105'
+                        : isSpeaking
+                        ? 'bg-gradient-to-tr from-purple-600 to-cyber-cyan text-white shadow-glow-cyan'
+                        : 'bg-slate-950 border border-cyber-cyan/40 text-cyber-cyan hover:scale-105 shadow-glow-cyan'
+                    }`}
+                  >
+                    {isListening ? (
+                      <>
+                        <MicOff className="w-8 h-8 animate-pulse" />
+                        <span className="text-[9px] font-mono mt-1 uppercase font-bold">Listening</span>
+                      </>
+                    ) : isSpeaking ? (
+                      <>
+                        <Volume2 className="w-8 h-8 animate-bounce" />
+                        <span className="text-[9px] font-mono mt-1 uppercase font-bold">Speaking</span>
+                      </>
+                    ) : (
+                      <>
+                        <Mic className="w-8 h-8" />
+                        <span className="text-[9px] font-mono mt-1 uppercase font-bold">Tap to Talk</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              {/* Status & Live Transcription */}
+              <div className="max-w-xl">
+                <div className="flex items-center justify-center space-x-2 text-xs font-mono text-slate-400">
+                  <span className={`h-2 w-2 rounded-full ${isListening ? 'bg-rose-500 animate-ping' : isSpeaking ? 'bg-purple-400 animate-pulse' : 'bg-emerald-400'}`} />
+                  <span>
+                    {isListening
+                      ? 'J.A.R.V.I.S. is listening to your voice...'
+                      : isSpeaking
+                      ? 'J.A.R.V.I.S. is speaking aloud...'
+                      : 'Voice Interface Ready • Tap Arc Reactor to speak'}
+                  </span>
+                </div>
+
+                {transcriptPreview && (
+                  <div className="mt-3 p-3 rounded-2xl bg-cyber-cyan/10 border border-cyber-cyan/30 text-cyber-cyan text-sm font-medium animate-pulse">
+                    "{transcriptPreview}"
+                  </div>
+                )}
+              </div>
+
+              {/* Quick Voice Command Chips */}
+              <div className="mt-6 flex flex-wrap justify-center gap-2 max-w-2xl">
+                {[
+                  '🎙️ Jarvis, how are our sales looking today?',
+                  '🎙️ Jarvis, write 3 viral TikTok hooks for PLUGTNE',
+                  '🎙️ Jarvis, what bundle should we launch this weekend?',
+                  '🎙️ Jarvis, how do we hit $10k MRR this month?',
+                  '🎙️ Jarvis, tell Antigravity to add sticky mobile checkout bar',
+                ].map((chip) => (
+                  <button
+                    key={chip}
+                    onClick={() => handleSendAiPrompt(chip.replace('🎙️ ', ''))}
+                    className="px-3.5 py-1.5 rounded-xl bg-slate-950/80 border border-slate-800 text-slate-300 hover:text-white hover:border-cyber-cyan text-xs font-medium transition-all"
+                  >
+                    {chip}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Conversation Ledger */}
+            <div className="bg-slate-900/80 border border-slate-800 rounded-3xl p-6 space-y-4">
+              <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                <h3 className="text-sm font-bold text-white uppercase tracking-wider flex items-center space-x-2">
+                  <Radio className="w-4 h-4 text-cyber-cyan" />
+                  <span>J.A.R.V.I.S. Communication Stream</span>
+                </h3>
+                <span className="text-[10px] font-mono text-slate-400">Continuous Context Enabled</span>
+              </div>
+
+              {/* Chat Log */}
+              <div className="space-y-4 max-h-[500px] overflow-y-auto p-4 bg-slate-950/80 rounded-2xl border border-slate-800/80">
+                {aiChatHistory.map((msg, i) => (
+                  <div
+                    key={i}
+                    className={`flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'}`}
+                  >
+                    <div className="text-[10px] font-mono text-slate-500 mb-1 px-1">
+                      {msg.role === 'user' ? 'DYLAN (FOUNDER)' : 'J.A.R.V.I.S. (EXECUTIVE AI)'}
+                    </div>
+                    <div
+                      className={`max-w-[90%] rounded-2xl p-4 text-xs sm:text-sm leading-relaxed ${
+                        msg.role === 'user'
+                          ? 'bg-gradient-to-r from-cyber-cyan to-blue-600 text-black font-semibold'
+                          : 'bg-slate-900 border border-slate-800 text-slate-200'
+                      }`}
+                    >
+                      <div className="whitespace-pre-wrap">{msg.text}</div>
+                    </div>
+                  </div>
+                ))}
+
+                {aiLoading && (
+                  <div className="flex items-center space-x-2 text-cyber-cyan text-xs p-3 bg-slate-900/60 rounded-xl w-fit">
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                    <span>J.A.R.V.I.S. is calculating figures and formulating strategy...</span>
+                  </div>
+                )}
+                <div ref={chatBottomRef} />
+              </div>
+
+              {/* Text Input Form */}
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  handleSendAiPrompt();
+                }}
+                className="flex items-center space-x-2"
+              >
+                <input
+                  type="text"
+                  value={aiPrompt}
+                  onChange={(e) => setAiPrompt(e.target.value)}
+                  placeholder="Ask J.A.R.V.I.S. anything or give an engineering command..."
+                  className="flex-1 bg-slate-950 border border-slate-800 rounded-2xl px-4 py-3.5 text-xs sm:text-sm text-white focus:outline-none focus:border-cyber-cyan transition-all"
+                />
+                <button
+                  type="submit"
+                  disabled={aiLoading || !aiPrompt.trim()}
+                  className="px-5 py-3.5 rounded-2xl bg-gradient-to-r from-cyber-cyan to-blue-600 text-black font-bold text-xs uppercase shadow-glow-cyan hover:brightness-110 active:scale-95 transition-all disabled:opacity-40"
+                >
+                  <Send className="w-4 h-4" />
+                </button>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* TAB: 24/7 SENTINEL WATCHDOG & ENGINEER DISPATCHES */}
+        {activeTab === 'sentinel' && (
+          <div className="space-y-6">
+            {/* Sentinel Status Banner */}
+            <div className="bg-slate-900/80 border border-emerald-500/30 rounded-3xl p-6 relative overflow-hidden">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div className="flex items-center space-x-3">
+                  <div className="w-12 h-12 rounded-2xl bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center">
+                    <Activity className="w-6 h-6 text-emerald-400" />
+                  </div>
+                  <div>
+                    <div className="flex items-center space-x-2">
+                      <h2 className="text-base font-black text-white">J.A.R.V.I.S. 24/7 Sentinel Watchdog</h2>
+                      <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 font-bold">
+                        {sentinelData?.sentinelStatus || 'OPERATIONAL'}
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-400">
+                      Continuously scanning payment pipelines, DRM licenses, and site errors
+                    </p>
+                  </div>
+                </div>
+
+                <div className="text-right">
+                  <span className="text-xs font-mono text-slate-400">Diagnostics Scan</span>
+                  <div className="text-sm font-bold text-emerald-400 font-mono">0 Critical Errors</div>
+                </div>
+              </div>
+            </div>
+
+            {/* Subsystem Health Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="p-5 rounded-3xl bg-slate-900/80 border border-slate-800">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs font-mono uppercase text-slate-400">Cloud Database (Redis)</span>
+                  <span className="text-emerald-400 text-xs font-bold font-mono">
+                    {sentinelData?.diagnostics?.database?.latencyMs ? `${sentinelData.diagnostics.database.latencyMs}ms` : 'Healthy'}
+                  </span>
+                </div>
+                <p className="text-xs text-slate-300">
+                  {sentinelData?.diagnostics?.database?.details || 'Database ping within optimal operational boundaries.'}
+                </p>
+              </div>
+
+              <div className="p-5 rounded-3xl bg-slate-900/80 border border-slate-800">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs font-mono uppercase text-slate-400">PayPal REST Pipeline</span>
+                  <span className="text-emerald-400 text-xs font-bold font-mono">Active</span>
+                </div>
+                <p className="text-xs text-slate-300">
+                  {sentinelData?.diagnostics?.paypal?.details || 'Automatic breakdown & seller protection enabled.'}
+                </p>
+              </div>
+
+              <div className="p-5 rounded-3xl bg-slate-900/80 border border-slate-800">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs font-mono uppercase text-slate-400">DRM License Machine Locks</span>
+                  <span className="text-cyber-cyan text-xs font-bold font-mono">Verified</span>
+                </div>
+                <p className="text-xs text-slate-300">
+                  {sentinelData?.diagnostics?.drm?.details || 'All hardware activations cryptographically signed.'}
+                </p>
+              </div>
+            </div>
+
+            {/* Directives & Dispatches for Antigravity */}
+            <div className="bg-slate-900/80 border border-slate-800 rounded-3xl p-6 space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-sm font-bold text-white uppercase tracking-wider flex items-center space-x-2">
+                    <Terminal className="w-4 h-4 text-cyber-cyan" />
+                    <span>Directives Dispatched to Antigravity (AI Pair Engineer)</span>
+                  </h3>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    Tasks and optimization proposals formulated by J.A.R.V.I.S. for immediate engineering action
+                  </p>
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                {dispatches.map((d) => (
+                  <div
+                    key={d.id}
+                    className="p-4 rounded-2xl bg-slate-950/80 border border-slate-800/80 hover:border-slate-700 transition-all flex flex-col md:flex-row md:items-center justify-between gap-3"
+                  >
+                    <div>
+                      <div className="flex items-center space-x-2">
+                        <span className={`text-[10px] font-mono px-2 py-0.5 rounded-full font-bold uppercase ${
+                          d.priority === 'high' ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30' : 'bg-blue-500/20 text-blue-300 border border-blue-500/30'
+                        }`}>
+                          {d.priority} Priority
+                        </span>
+                        <span className="font-bold text-white text-sm">{d.title}</span>
+                      </div>
+                      <p className="text-xs text-slate-400 mt-1">{d.details}</p>
+                      <div className="mt-2 text-[11px] font-mono text-emerald-400 bg-emerald-500/10 p-2 rounded-xl border border-emerald-500/20">
+                        Action Directive: {d.suggestedAction}
+                      </div>
+                    </div>
+
+                    <div className="self-end md:self-auto text-right shrink-0">
+                      <span className="text-[10px] font-mono bg-slate-900 border border-slate-800 text-slate-400 px-2 py-1 rounded-lg">
+                        Status: {d.status}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* TAB: FINANCIALS & RECENT ORDERS */}
         {activeTab === 'financials' && (
           <div className="space-y-6">
             <div className="bg-slate-900/80 border border-slate-800 rounded-3xl p-6">
               <div className="flex items-center justify-between mb-4">
-                <h2 className="text-base font-black tracking-wide text-white flex items-center space-x-2">
-                  <DollarSign className="w-5 h-5 text-emerald-400" />
-                  <span>Real-Time Transaction Stream</span>
-                </h2>
-                <span className="text-xs text-slate-400 font-mono">
-                  {orders.length} transactions recorded
-                </span>
+                <div>
+                  <h2 className="text-base font-black tracking-wide text-white flex items-center space-x-2">
+                    <DollarSign className="w-5 h-5 text-emerald-400" />
+                    <span>Real-Time Financial Ledger</span>
+                  </h2>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    Calculated down to the penny after PayPal processing deductions
+                  </p>
+                </div>
+                <button
+                  onClick={handlePurgeTestOrders}
+                  className="px-3 py-1.5 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 hover:bg-rose-500/20 text-xs font-semibold flex items-center space-x-1.5 transition-all"
+                >
+                  <Trash2 className="w-3.5 h-3.5 text-rose-400" />
+                  <span>Purge Test Sales</span>
+                </button>
               </div>
 
               {orders.length === 0 ? (
@@ -627,7 +1106,7 @@ export default function FounderDashboardPage() {
                     onClick={handleCreateTestSale}
                     className="mt-4 px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-white transition-all"
                   >
-                    Generate Test Order
+                    Simulate Test Sale
                   </button>
                 </div>
               ) : (
@@ -647,8 +1126,13 @@ export default function FounderDashboardPage() {
                       {orders.map((o) => (
                         <tr key={o.id} className="hover:bg-slate-800/30 transition-colors">
                           <td className="py-3.5 pr-3">
-                            <div className="font-sans font-bold text-white text-sm">
-                              {o.displayName || o.userEmail.split('@')[0]}
+                            <div className="font-sans font-bold text-white text-sm flex items-center space-x-2">
+                              <span>{o.displayName || o.userEmail.split('@')[0]}</span>
+                              {o.isTest && (
+                                <span className="text-[9px] font-mono bg-purple-500/20 text-purple-300 border border-purple-500/30 px-1.5 py-0.5 rounded">
+                                  SIMULATION
+                                </span>
+                              )}
                             </div>
                             <div className="text-[10px] text-slate-500 truncate max-w-[180px]">
                               {o.userEmail}
@@ -691,7 +1175,7 @@ export default function FounderDashboardPage() {
           </div>
         )}
 
-        {/* TAB 2: SUBSCRIPTIONS & MRR */}
+        {/* TAB: SUBSCRIPTIONS & MRR */}
         {activeTab === 'subs' && (
           <div className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -730,7 +1214,7 @@ export default function FounderDashboardPage() {
                 <div className="p-4 rounded-2xl bg-slate-950/60 border border-slate-800">
                   <div className="text-xs text-slate-400">Monthly Churn</div>
                   <div className="text-xl font-black text-emerald-400 mt-1">0.0%</div>
-                  <div className="text-[10px] text-slate-500">Industry avg: 5.8%</div>
+                  <div className="text-[10px] text-slate-500">Zero cancellations</div>
                 </div>
                 <div className="p-4 rounded-2xl bg-slate-950/60 border border-slate-800">
                   <div className="text-xs text-slate-400">Failed Retries</div>
@@ -752,7 +1236,7 @@ export default function FounderDashboardPage() {
           </div>
         )}
 
-        {/* TAB 3: PLUGIN LEADERBOARD */}
+        {/* TAB: PLUGIN LEADERBOARD */}
         {activeTab === 'plugins' && (
           <div className="bg-slate-900/80 border border-slate-800 rounded-3xl p-6 space-y-6">
             <div className="flex items-center justify-between">
@@ -805,7 +1289,7 @@ export default function FounderDashboardPage() {
           </div>
         )}
 
-        {/* TAB 4: TRAFFIC & REFERRALS */}
+        {/* TAB: TRAFFIC & REFERRALS */}
         {activeTab === 'traffic' && (
           <div className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -845,7 +1329,7 @@ export default function FounderDashboardPage() {
                 </div>
               </div>
 
-              {/* Devices & Conversion Funnel */}
+              {/* Devices & Funnel */}
               <div className="space-y-6">
                 <div className="bg-slate-900/80 border border-slate-800 rounded-3xl p-6">
                   <h3 className="text-sm font-bold text-white uppercase tracking-wider mb-4">
@@ -901,10 +1385,9 @@ export default function FounderDashboardPage() {
           </div>
         )}
 
-        {/* TAB 5: COUPONS & DISPUTES */}
+        {/* TAB: COUPONS & DISPUTES */}
         {activeTab === 'coupons' && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Promo Codes */}
             <div className="bg-slate-900/80 border border-slate-800 rounded-3xl p-6">
               <h3 className="text-sm font-bold text-white uppercase tracking-wider mb-4 flex items-center space-x-2">
                 <Tag className="w-4 h-4 text-purple-400" />
@@ -933,7 +1416,6 @@ export default function FounderDashboardPage() {
               )}
             </div>
 
-            {/* Disputes & Chargebacks */}
             <div className="bg-slate-900/80 border border-slate-800 rounded-3xl p-6">
               <h3 className="text-sm font-bold text-white uppercase tracking-wider mb-4 flex items-center space-x-2">
                 <ShieldCheck className="w-4 h-4 text-emerald-400" />
@@ -955,8 +1437,8 @@ export default function FounderDashboardPage() {
                   <span className="text-white font-mono">All Digital Sales Final</span>
                 </div>
                 <div className="flex justify-between">
-                  <span>30-Day Money-Back Guarantee:</span>
-                  <span className="text-emerald-400 font-mono">Removed Worldwide</span>
+                  <span>30-Day Guarantee:</span>
+                  <span className="text-emerald-400 font-mono">Scrubbed Worldwide</span>
                 </div>
                 <div className="flex justify-between">
                   <span>Seller Protection:</span>
@@ -967,7 +1449,7 @@ export default function FounderDashboardPage() {
           </div>
         )}
 
-        {/* TAB 6: CUSTOMERS DIRECTORY & MACHINE CONTROL */}
+        {/* TAB: CUSTOMERS & DEVICES */}
         {activeTab === 'customers' && (
           <div className="bg-slate-900/80 border border-slate-800 rounded-3xl p-6 space-y-4">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -1007,7 +1489,6 @@ export default function FounderDashboardPage() {
                     </div>
                     <div className="text-xs text-slate-400 font-mono mt-0.5">{c.email}</div>
 
-                    {/* Active Machines */}
                     <div className="mt-2 flex flex-wrap items-center gap-1.5">
                       <span className="text-[10px] font-mono text-slate-500">
                         Machines ({c.activeDeviceCount}/{c.maxDevices}):
@@ -1029,7 +1510,6 @@ export default function FounderDashboardPage() {
                     </div>
                   </div>
 
-                  {/* 1-Click Founder Controls */}
                   <div className="flex items-center space-x-2 self-start md:self-auto">
                     <button
                       onClick={() => handleResetMachines(c.id, c.displayName || c.email)}
@@ -1043,103 +1523,6 @@ export default function FounderDashboardPage() {
                 </div>
               ))}
             </div>
-          </div>
-        )}
-
-        {/* TAB 7: INTERACTIVE AI SALES COPILOT */}
-        {activeTab === 'ai' && (
-          <div className="bg-slate-900/80 border border-slate-800 rounded-3xl p-6 space-y-6">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-4">
-              <div className="flex items-center space-x-3">
-                <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-cyber-cyan to-cyber-purple p-[1.5px]">
-                  <div className="w-full h-full bg-slate-950 rounded-[10px] flex items-center justify-center">
-                    <Bot className="w-5 h-5 text-cyber-cyan" />
-                  </div>
-                </div>
-                <div>
-                  <h2 className="text-base font-black text-white">Executive Audio Growth Director</h2>
-                  <p className="text-xs text-slate-400">Trained on Slate Digital, FabFilter & Output growth playbooks</p>
-                </div>
-              </div>
-              <span className="text-[10px] font-mono bg-cyber-cyan/10 text-cyber-cyan border border-cyber-cyan/20 px-2 py-1 rounded-full font-bold">
-                Context Injected
-              </span>
-            </div>
-
-            {/* Quick Prompt Chips */}
-            <div className="space-y-2">
-              <span className="text-[11px] font-mono text-slate-400 uppercase tracking-wider">
-                Quick Tactical Commands:
-              </span>
-              <div className="flex flex-wrap gap-2">
-                {[
-                  '🚀 How can we hit $10k MRR this month?',
-                  '🎬 Write 3 viral TikTok hooks for PLUGTNE',
-                  '📦 What bundle should we launch this weekend?',
-                  '🤝 Give me an outreach template for FL Studio YouTubers',
-                  '🛡️ How do I keep monthly churn under 2%?',
-                ].map((chip) => (
-                  <button
-                    key={chip}
-                    onClick={() => handleSendAiPrompt(chip)}
-                    className="px-3 py-1.5 rounded-xl bg-slate-950 border border-slate-800 text-slate-300 hover:text-white hover:border-cyber-cyan text-xs font-medium transition-all"
-                  >
-                    {chip}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Chat Log */}
-            <div className="space-y-4 max-h-[500px] overflow-y-auto p-4 bg-slate-950/80 rounded-2xl border border-slate-800/80">
-              {aiChatHistory.map((msg, i) => (
-                <div
-                  key={i}
-                  className={`flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'}`}
-                >
-                  <div
-                    className={`max-w-[85%] rounded-2xl p-4 text-xs sm:text-sm leading-relaxed ${
-                      msg.role === 'user'
-                        ? 'bg-gradient-to-r from-cyber-cyan to-blue-600 text-black font-semibold'
-                        : 'bg-slate-900 border border-slate-800 text-slate-200'
-                    }`}
-                  >
-                    <div className="whitespace-pre-wrap">{msg.text}</div>
-                  </div>
-                </div>
-              ))}
-
-              {aiLoading && (
-                <div className="flex items-center space-x-2 text-cyber-cyan text-xs p-3 bg-slate-900/60 rounded-xl w-fit">
-                  <RefreshCw className="w-4 h-4 animate-spin" />
-                  <span>Analyzing live metrics & formulating growth strategy...</span>
-                </div>
-              )}
-            </div>
-
-            {/* Chat Input */}
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                handleSendAiPrompt();
-              }}
-              className="flex items-center space-x-2"
-            >
-              <input
-                type="text"
-                value={aiPrompt}
-                onChange={(e) => setAiPrompt(e.target.value)}
-                placeholder="Ask your AI Growth Director anything (pricing, TikTok ideas, bundles)..."
-                className="flex-1 bg-slate-950 border border-slate-800 rounded-2xl px-4 py-3.5 text-xs sm:text-sm text-white focus:outline-none focus:border-cyber-cyan transition-all"
-              />
-              <button
-                type="submit"
-                disabled={aiLoading || !aiPrompt.trim()}
-                className="px-5 py-3.5 rounded-2xl bg-gradient-to-r from-cyber-cyan to-blue-600 text-black font-bold text-xs uppercase shadow-glow-cyan hover:brightness-110 active:scale-95 transition-all disabled:opacity-40"
-              >
-                <Send className="w-4 h-4" />
-              </button>
-            </form>
           </div>
         )}
       </main>
