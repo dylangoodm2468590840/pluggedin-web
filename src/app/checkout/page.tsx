@@ -20,7 +20,9 @@ import {
 import { PayPalScriptProvider, PayPalButtons } from '@paypal/react-paypal-js';
 import { ALL_ACCESS_MONTHLY, ALL_ACCESS_ANNUAL, TOTAL_CATALOG_VALUE, PLUGINS_DATA } from '../../data/plugins';
 
-const PAYPAL_CLIENT_ID = process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID || '';
+const PAYPAL_CLIENT_ID =
+  process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID ||
+  'BAAUTEa1YBf_hAQZul3C8mBHiWpdOwAqYV8KammrMdLcYcpvvD-vw__gdx-_xcMHoNSIBd00VkT16JUKLg';
 
 export default function CheckoutPage() {
   const router = useRouter();

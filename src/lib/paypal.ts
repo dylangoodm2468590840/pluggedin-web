@@ -1,6 +1,10 @@
 // PayPal REST API v2 Helper
-const PAYPAL_CLIENT_ID = process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID || '';
-const PAYPAL_CLIENT_SECRET = process.env.PAYPAL_CLIENT_SECRET || '';
+const PAYPAL_CLIENT_ID =
+  process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID ||
+  'BAAUTEa1YBf_hAQZul3C8mBHiWpdOwAqYV8KammrMdLcYcpvvD-vw__gdx-_xcMHoNSIBd00VkT16JUKLg';
+const PAYPAL_CLIENT_SECRET =
+  process.env.PAYPAL_CLIENT_SECRET ||
+  'EKisDoJrADhA7mNQz8xz0pq2CeVhxvA0mkYG7RyzN8Y91Y4zPQA868VYCoZ0TFWBegOCZNjkiMGbQruL';
 const PAYPAL_ENV = process.env.PAYPAL_MODE || 'live'; // 'sandbox' | 'live'
 
 const PAYPAL_BASE_URL =
