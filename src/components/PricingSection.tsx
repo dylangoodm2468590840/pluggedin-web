@@ -15,7 +15,7 @@ const COMPARISON_ROWS = [
   { feature: 'Simultaneous Studio Authorizations', single: '3 Machines', allAccess: '3 Machines', founders: '5 Machines' },
   { feature: 'Hardware Dongle Requirement', single: 'Zero (No iLok)', allAccess: 'Zero (No iLok)', founders: 'Zero (No iLok)' },
   { feature: 'Offline Studio Activation', single: 'Supported', allAccess: 'Supported', founders: 'Supported' },
-  { feature: '30-Day Money-Back Guarantee', single: 'Included', allAccess: 'Cancel Anytime', founders: 'Lifetime Access' },
+  { feature: 'Instant Digital License Delivery', single: 'Instant Access', allAccess: 'Instant Access', founders: 'Instant Access' },
 ];
 
 const FAQS = [
@@ -243,7 +243,7 @@ export const PricingSection: React.FC = () => {
               </div>
               <div className="flex items-center space-x-2">
                 <Check className="w-4 h-4 text-emerald-400 shrink-0" />
-                <span>30-Day Money-Back Guarantee</span>
+                <span>Zero Hardware Dongles Required (No iLok)</span>
               </div>
             </div>
           </div>

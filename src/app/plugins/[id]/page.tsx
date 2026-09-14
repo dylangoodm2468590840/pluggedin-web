@@ -241,9 +241,9 @@ export default function PluginDetailPage({ params }: { params: { id: string } })
             <ShieldCheck className="w-6 h-6 text-cyber-cyan" />
           </div>
           <div>
-            <h4 className="text-base font-black text-white">30-Day Money-Back Guarantee & Zero Dongles</h4>
+            <h4 className="text-base font-black text-white">Instant Digital Delivery & Zero Dongles</h4>
             <p className="text-xs text-slate-400 mt-0.5">
-              If {plugin.shortName} doesn&apos;t instantly improve your production workflow, reach out within 30 days for a 100% refund. No iLok USB hardware dongle required.
+              All digital software license sales are final. Instant machine authorization and offline DAW usage via PluggedIN Central with no iLok USB hardware dongles required.
             </p>
           </div>
         </div>
