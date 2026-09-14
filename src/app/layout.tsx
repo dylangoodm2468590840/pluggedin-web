@@ -40,6 +40,14 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" className="dark">
+      <head>
+        <link rel="prefetch" href="/audio/vocal_dry.wav" as="audio" />
+        <link rel="prefetch" href="/audio/vocal_tuned.wav" as="audio" />
+        <link rel="prefetch" href="/audio/808_dry.wav" as="audio" />
+        <link rel="prefetch" href="/audio/808_wet.wav" as="audio" />
+        <link rel="prefetch" href="/audio/sample_dry.wav" as="audio" />
+        <link rel="prefetch" href="/audio/sample_wet.wav" as="audio" />
+      </head>
       <body className="min-h-screen flex flex-col bg-studio-950 text-slate-100 antialiased selection:bg-cyber-cyan selection:text-black">
         <TrafficTracker />
         <Header />

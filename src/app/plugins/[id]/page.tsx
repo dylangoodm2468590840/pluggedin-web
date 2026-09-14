@@ -27,7 +27,7 @@ export default function PluginDetailPage({ params }: { params: { id: string } })
   }
 
   return (
-    <div className="py-16 max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div className="pt-16 pb-28 sm:pb-16 max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
       {/* Top All-Access Pass Promo Banner */}
       <div className="mb-8 p-4 sm:p-5 rounded-3xl bg-gradient-to-r from-cyber-purple/20 via-studio-900 to-cyber-cyan/20 border border-cyber-cyan/30 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-glow-cyan">
         <div className="flex items-center space-x-3.5">
@@ -255,6 +255,26 @@ export default function PluginDetailPage({ params }: { params: { id: string } })
           <Download className="w-4 h-4 text-cyber-cyan" />
           <span>Install with Central</span>
         </Link>
+      </div>
+
+      {/* Floating Sticky Mobile Checkout Bar */}
+      <div className="fixed bottom-0 inset-x-0 sm:hidden z-30 p-3 bg-studio-950/95 backdrop-blur-xl border-t border-white/10 shadow-2xl pb-[max(env(safe-area-inset-bottom),0.75rem)]">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <div className="text-xs font-black text-white">{plugin.name}</div>
+            <div className="flex items-center space-x-1.5 text-[11px] font-mono">
+              <span className="text-emerald-400 font-bold">$14.99/mo</span>
+              <span className="text-slate-500">or $79 flat</span>
+            </div>
+          </div>
+          <Link
+            href="/checkout?plan=monthly"
+            className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-cyber-cyan to-blue-600 hover:brightness-110 text-black font-black text-xs shadow-glow-cyan flex items-center space-x-1.5 shrink-0 active:scale-95 transition-all"
+          >
+            <span>Get Pass ($14.99/mo)</span>
+            <ArrowRight className="w-3.5 h-3.5" />
+          </Link>
+        </div>
       </div>
     </div>
   );

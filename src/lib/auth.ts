@@ -909,6 +909,61 @@ export async function revokeUserAccess(userId: string): Promise<UserSafeProfile>
   return toSafeProfile(user);
 }
 
+export interface JarvisMemoryItem {
+  timestamp: string;
+  topic: string;
+  userPrompt: string;
+  keyInsight: string;
+}
+
+export async function fetchJarvisMemory(): Promise<JarvisMemoryItem[]> {
+  const redis = getRedis();
+  if (redis) {
+    try {
+      const data = await redis.get('pluggedin_jarvis_learning_memory');
+      if (Array.isArray(data)) return data;
+      if (typeof data === 'string') {
+        try {
+          return JSON.parse(data);
+        } catch {}
+      }
+    } catch (e) {
+      console.warn('Error fetching Jarvis memory from Upstash:', e);
+    }
+  }
+  return [];
+}
+
+export async function recordJarvisMemory(item: JarvisMemoryItem): Promise<void> {
+  const redis = getRedis();
+  const mem = await fetchJarvisMemory();
+  mem.unshift(item);
+  if (redis) {
+    try {
+      await redis.set('pluggedin_jarvis_learning_memory', mem.slice(0, 100));
+    } catch (e) {
+      console.warn('Error saving Jarvis memory to Upstash:', e);
+    }
+  }
+}
+
+export async function updateJarvisDispatchStatus(id: string, status: 'open' | 'addressed' | 'resolved'): Promise<void> {
+  const redis = getRedis();
+  const dispatches = await fetchJarvisDispatches();
+  const target = dispatches.find((d) => d.id === id);
+  if (target) {
+    target.status = status;
+    if (redis) {
+      try {
+        await redis.set('pluggedin_jarvis_dispatches', dispatches);
+      } catch (e) {
+        console.warn('Error updating dispatch status in Upstash:', e);
+      }
+    }
+  }
+}
+
+
 
 
 

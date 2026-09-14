@@ -5,6 +5,8 @@ import {
   fetchAllUsersSafe,
   recordJarvisDispatch,
   JarvisDispatch,
+  fetchJarvisMemory,
+  recordJarvisMemory,
 } from '../../../../lib/auth';
 
 const FOUNDER_EMAILS = ['dylangoodm@gmail.com', 'dylan@pluggedin.studio'];
@@ -88,6 +90,16 @@ export async function POST(req: NextRequest) {
       await recordJarvisDispatch(dispatchLogged);
     }
 
+    const memories = await fetchJarvisMemory();
+    const memoryString =
+      memories.length > 0
+        ? `\nPrior Discussions & Evolving Founder Directives (Continuous Learning Core):\n` +
+          memories
+            .slice(0, 8)
+            .map((m) => `- Dylan: "${m.userPrompt}" -> Core Takeaway: ${m.keyInsight}`)
+            .join('\n')
+        : '';
+
     // 1. External AI Model Hook (if Gemini API key is configured)
     if (process.env.GEMINI_API_KEY) {
       try {
@@ -111,6 +123,7 @@ Current Real-Time Metrics:
 - Monthly Recurring Revenue (MRR): $${mrr.toFixed(2)}
 - Conversion Rate: ${conversion}%
 - Flagship Plugins: PLUGTNE (Vocal Pitch Correction), UNDERGRND (Analog Heat), PLUGCHOP 2.0 (16-Pad Sampler), PLUG VOX (Vocal Chain), PLUGGED 1.
+${memoryString}
 
 User question from Dylan: "${prompt}".
 Provide your answer in two sections separated by [SPEECH_BREAK]:
@@ -283,6 +296,14 @@ At your service, Sir. Based on our real-time metrics (Net Take-Home: **\$${net.t
 
 How would you like to proceed, Sir?`;
     }
+
+    // Record interaction into Jarvis's persistent memory core
+    await recordJarvisMemory({
+      timestamp: new Date().toISOString(),
+      topic: prompt.slice(0, 40),
+      userPrompt: prompt,
+      keyInsight: speech || advice.slice(0, 150),
+    });
 
     return NextResponse.json({
       success: true,

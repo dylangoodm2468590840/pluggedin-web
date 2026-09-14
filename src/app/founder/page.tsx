@@ -177,6 +177,7 @@ export default function FounderDashboardPage() {
   const recognitionRef = useRef<any>(null);
   const chatBottomRef = useRef<HTMLDivElement>(null);
   const handleSendAiPromptRef = useRef<(prompt?: string) => Promise<void>>(async () => {});
+  const audioPlayerRef = useRef<HTMLAudioElement | null>(null);
 
   // Auto-auth check on mount
   useEffect(() => {
@@ -185,11 +186,23 @@ export default function FounderDashboardPage() {
       setPin(savedPin);
       setIsAuthenticated(true);
     }
+    if (typeof window !== 'undefined') {
+      audioPlayerRef.current = new Audio();
+    }
   }, []);
 
-  // Unlock audio & haptics for iOS Safari / WebKit
+  // Unlock audio & haptics for iOS Safari / WebKit (Media Channel & Ambient)
   const unlockAudioOnTouch = () => {
     if (typeof window === 'undefined') return;
+    try {
+      if (!audioPlayerRef.current) {
+        audioPlayerRef.current = new Audio();
+      }
+      // Prime media player with silent wav data URI to authorize later async voice playback
+      audioPlayerRef.current.src =
+        'data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA';
+      audioPlayerRef.current.play().catch(() => {});
+    } catch (_) {}
     try {
       if (window.speechSynthesis) {
         window.speechSynthesis.resume();
@@ -216,19 +229,15 @@ export default function FounderDashboardPage() {
     }
   };
 
-  // Voice output synthesis (Jarvis speaks)
-  const speakJarvisVoice = useCallback((textToSpeak: string) => {
-    if (!isVoiceEnabled || typeof window === 'undefined' || !window.speechSynthesis) return;
-
+  // Fallback client-side speech synthesis
+  const fallbackSynthesis = useCallback((cleanText: string) => {
+    if (typeof window === 'undefined' || !window.speechSynthesis) {
+      setIsSpeaking(false);
+      return;
+    }
     try {
-      window.speechSynthesis.cancel(); // Stop any ongoing speech
-
-      const cleanText = textToSpeak.replace(/[\#\*\_\[\]]/g, '').trim();
-      if (!cleanText) return;
-
+      window.speechSynthesis.cancel();
       const utterance = new SpeechSynthesisUtterance(cleanText);
-
-      // Prefer British English male voice for authentic Jarvis feel
       const voices = window.speechSynthesis.getVoices();
       const jarvisVoice =
         voices.find((v) => v.lang === 'en-GB' && (v.name.includes('Daniel') || v.name.includes('George') || v.name.includes('Oliver') || v.name.includes('Male'))) ||
@@ -236,24 +245,49 @@ export default function FounderDashboardPage() {
         voices.find((v) => v.name.includes('Google UK English Male')) ||
         voices.find((v) => v.lang.startsWith('en'));
 
-      if (jarvisVoice) {
-        utterance.voice = jarvisVoice;
-      }
-
+      if (jarvisVoice) utterance.voice = jarvisVoice;
       utterance.rate = 1.0;
       utterance.pitch = 0.95;
-
       utterance.onstart = () => setIsSpeaking(true);
       utterance.onend = () => setIsSpeaking(false);
       utterance.onerror = () => setIsSpeaking(false);
-
       window.speechSynthesis.resume();
       window.speechSynthesis.speak(utterance);
-    } catch (e) {
-      console.warn('Speech error:', e);
+    } catch (_) {
       setIsSpeaking(false);
     }
-  }, [isVoiceEnabled]);
+  }, []);
+
+  // Voice output synthesis (Jarvis speaks aloud via media player channel)
+  const speakJarvisVoice = useCallback((textToSpeak: string) => {
+    if (!isVoiceEnabled || typeof window === 'undefined') return;
+
+    const cleanText = textToSpeak.replace(/[^a-zA-Z0-9\s.,!?'$-]/g, ' ').slice(0, 300).trim();
+    if (!cleanText) return;
+
+    setIsSpeaking(true);
+
+    try {
+      // 1. Primary: High-fidelity MP3 Stream via Media Channel (plays even if iPhone silent switch is ON!)
+      const audio = audioPlayerRef.current || new Audio();
+      audio.src = `/api/founder/tts?text=${encodeURIComponent(cleanText)}&pin=${pin || '8492'}`;
+      audio.onplay = () => setIsSpeaking(true);
+      audio.onended = () => setIsSpeaking(false);
+      audio.onerror = () => {
+        fallbackSynthesis(cleanText);
+      };
+
+      const playPromise = audio.play();
+      if (playPromise !== undefined) {
+        playPromise.catch((err) => {
+          console.warn('Audio stream play prevented, trying speech synthesis fallback:', err);
+          fallbackSynthesis(cleanText);
+        });
+      }
+    } catch (e) {
+      fallbackSynthesis(cleanText);
+    }
+  }, [isVoiceEnabled, pin, fallbackSynthesis]);
 
   // Robust Dynamic Speech Recognition (Tap-to-Talk)
   const toggleMic = async () => {
@@ -424,6 +458,29 @@ export default function FounderDashboardPage() {
       }
     } catch (e: any) {
       alert(e.message);
+    }
+  };
+
+  const handleUpdateDispatchStatus = async (dispatchId: string, newStatus: 'open' | 'addressed' | 'resolved') => {
+    try {
+      const res = await fetch('/api/founder/actions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-founder-pin': pin || '8492',
+        },
+        body: JSON.stringify({ action: 'dispatch_status', dispatchId, status: newStatus }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setDispatches((prev) =>
+          prev.map((d) => (d.id === dispatchId ? { ...d, status: newStatus } : d))
+        );
+        setActionMessage(`✓ Directive updated to ${newStatus}`);
+        setTimeout(() => setActionMessage(null), 4000);
+      }
+    } catch (e: any) {
+      console.error(e);
     }
   };
 
@@ -1312,10 +1369,23 @@ export default function FounderDashboardPage() {
                       </div>
                     </div>
 
-                    <div className="self-end md:self-auto text-right shrink-0">
-                      <span className="text-[10px] font-mono bg-slate-900 border border-slate-800 text-slate-400 px-2 py-1 rounded-lg">
-                        Status: {d.status}
+                    <div className="self-end md:self-auto flex items-center space-x-2 shrink-0">
+                      <span className={`text-[10px] font-mono px-2.5 py-1 rounded-lg border uppercase font-bold tracking-wider ${
+                        d.status === 'resolved' ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40' :
+                        d.status === 'addressed' ? 'bg-cyan-500/20 text-cyan-300 border-cyan-500/40' :
+                        'bg-amber-500/20 text-amber-300 border-amber-500/30'
+                      }`}>
+                        {d.status === 'resolved' ? '✓ Resolved' : d.status}
                       </span>
+                      {d.status !== 'resolved' && (
+                        <button
+                          onClick={() => handleUpdateDispatchStatus(d.id, 'resolved')}
+                          className="px-2.5 py-1 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20 text-xs font-semibold transition-all active:scale-95"
+                          title="Mark directive as resolved"
+                        >
+                          Resolve Directive
+                        </button>
+                      )}
                     </div>
                   </div>
                 ))}

@@ -7,6 +7,7 @@ import {
   purgeTestOrders,
   recordJarvisDispatch,
   fetchJarvisDispatches,
+  updateJarvisDispatchStatus,
   OrderRecord,
   JarvisDispatch,
 } from '../../../../lib/auth';
@@ -49,7 +50,7 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json();
-    const { action, userId, orderData, dispatchData } = body;
+    const { action, userId, orderData, dispatchData, dispatchId, status } = body;
 
     if (action === 'reset_machines') {
       if (!userId) {
@@ -121,6 +122,16 @@ export async function POST(req: NextRequest) {
       };
       await recordJarvisDispatch(dispatch);
       return NextResponse.json({ success: true, message: 'Dispatch transmitted to engineering', dispatch });
+    }
+
+    if (action === 'dispatch_status' || action === 'update_dispatch_status') {
+      const targetId = dispatchId || dispatchData?.id;
+      const targetStatus = status || dispatchData?.status;
+      if (!targetId || !targetStatus) {
+        return NextResponse.json({ success: false, error: 'dispatchId and status required' }, { status: 400 });
+      }
+      await updateJarvisDispatchStatus(targetId, targetStatus);
+      return NextResponse.json({ success: true, message: `Dispatch ${targetId} updated to ${targetStatus}` });
     }
 
     return NextResponse.json({ success: false, error: 'Unknown action' }, { status: 400 });
