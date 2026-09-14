@@ -192,6 +192,25 @@ When Dylan asks to design, formulate, invent, or brainstorm a NEW plugin idea or
 }
 [/PLUGIN_SPEC]
 
+
+MULTIPLE PLUGINS / VOCAL CHAIN ADS:
+When Dylan asks for an ad showing off "4 plugins", "vocal chain", "all plugins", or multiple plugins:
+Set:
+"isChainAd": true,
+"chainPlugins": [
+  { "id": "plugtne", "name": "1. PLUGTNE" },
+  { "id": "plugeq", "name": "2. PLUGEQ" },
+  { "id": "plugvox", "name": "3. PLUGVOX" },
+  { "id": "plugverb", "name": "4. PLUGVERB" }
+],
+And create 5-6 scenes where each scene introduces the next plugin in the chain with its own "pluginId":
+- Scene 1: Before / Raw Demo (audioMode: "dry", badgeText: "BEFORE: RAW DEMO", pluginId: "plugtne")
+- Scene 2: PLUGTNE (audioMode: "tuned", badgeText: "STEP 1: PLUGTNE 0MS SNAP", pluginId: "plugtne")
+- Scene 3: PLUGEQ (audioMode: "wet", badgeText: "STEP 2: PLUGEQ +3dB AIR", pluginId: "plugeq")
+- Scene 4: PLUGVOX (audioMode: "wet", badgeText: "STEP 3: PLUGVOX LEVELER", pluginId: "plugvox")
+- Scene 5: PLUGVERB (audioMode: "wet", badgeText: "STEP 4: PLUGVERB SPACE", pluginId: "plugverb")
+- Scene 6: Full Chain Active (audioMode: "wet", badgeText: "RADIO READY (4 PLUGINS)", pluginId: "plugverb")
+
 [AD_VIDEO]
 When Dylan asks to create, generate, script, or brainstorm an ad, video ad, TikTok promo, or commercial for any plugin (e.g. PLUGTNE, UNDERGRND, PLUGCHOP, PLUG VOX), generate an interactive video ad JSON block:
 {
@@ -346,11 +365,93 @@ When Dylan asks to create, generate, script, or brainstorm an ad, video ad, TikT
                 }
               }
 
-              // Fallback: If Dylan explicitly asked for an ad/video and JSON wasn't parsed, construct authentic video ad
+// Fallback: If Dylan explicitly asked for an ad/video and JSON wasn't parsed, construct authentic video ad
               if (!videoAdData && (lower.includes('ad') || lower.includes('video') || lower.includes('commercial') || lower.includes('promo'))) {
+                const isChain = lower.includes('4') || lower.includes('chain') || lower.includes('vocal chain') || lower.includes('all plug');
                 const isUnderground = lower.includes('undergrnd') || lower.includes('underground') || lower.includes('808');
                 const isPlugChop = lower.includes('chop') || lower.includes('sampler');
                 const isPlugVox = lower.includes('vox');
+
+                if (isChain) {
+                  videoAdData = {
+                    pluginId: 'plugtne',
+                    pluginName: 'Full Vocal Chain Suite (4 Plugins)',
+                    hookHeadline: 'How To Get Radio-Ready Vocals with 4 C++ Plugins in FL Studio',
+                    targetAudience: 'FL Studio Trap & Vocal Producers',
+                    aspectRatio: '9:16',
+                    audioPair: 'vocal',
+                    isChainAd: true,
+                    chainPlugins: [
+                      { id: 'plugtne', name: '1. PLUGTNE' },
+                      { id: 'plugeq', name: '2. PLUGEQ' },
+                      { id: 'plugvox', name: '3. PLUGVOX' },
+                      { id: 'plugverb', name: '4. PLUGVERB' },
+                    ],
+                    callToAction: 'Grab the All-Access Studio Pass at pluggedin.studio • Link in bio',
+                    scenes: [
+                      {
+                        sceneNumber: 1,
+                        durationSec: 3,
+                        headline: 'Stop letting raw, off-key vocals ruin your mix.',
+                        visualAction: 'Raw vocal in FL Studio with red pitch alert.',
+                        audioMode: 'dry',
+                        badgeText: 'BEFORE: RAW DEMO',
+                        subtitles: ['Stop', 'recording', 'amateur', 'vocals', 'in', 'FL', 'Studio.'],
+                        pluginId: 'plugtne',
+                      },
+                      {
+                        sceneNumber: 2,
+                        durationSec: 3,
+                        headline: 'Step 1: Snap pitch with PLUGTNE 0ms autotune.',
+                        visualAction: 'PLUGTNE GUI locks vocal pitch to F Minor in real-time.',
+                        audioMode: 'tuned',
+                        badgeText: 'STEP 1: PLUGTNE (0MS PITCH)',
+                        subtitles: ['One', 'click', 'and', 'your', 'pitch', 'snaps', 'instantly.'],
+                        pluginId: 'plugtne',
+                      },
+                      {
+                        sceneNumber: 3,
+                        durationSec: 3,
+                        headline: 'Step 2: Add Pultec air sheen with PLUGEQ.',
+                        visualAction: 'PLUGEQ Pultec high-shelf boosts +3dB at 10.5kHz for silky sparkle.',
+                        audioMode: 'wet',
+                        badgeText: 'STEP 2: PLUGEQ (+3dB AIR)',
+                        subtitles: ['Expensive', 'high', 'end', 'air', 'without', 'harshness.'],
+                        pluginId: 'plugeq',
+                      },
+                      {
+                        sceneNumber: 4,
+                        durationSec: 3,
+                        headline: 'Step 3: RVox optical leveling with PLUGVOX.',
+                        visualAction: 'PLUGVOX optical compression pins the vocal upfront.',
+                        audioMode: 'wet',
+                        badgeText: 'STEP 3: PLUGVOX (LEVELER)',
+                        subtitles: ['Smooth', 'optical', 'leveling', 'pins', 'the', 'vocal', 'upfront.'],
+                        pluginId: 'plugvox',
+                      },
+                      {
+                        sceneNumber: 5,
+                        durationSec: 3,
+                        headline: 'Step 4: Algorithmic plate space with PLUGVERB.',
+                        visualAction: 'PLUGVERB GUI with lush 1.6s ambient stereo decay.',
+                        audioMode: 'wet',
+                        badgeText: 'STEP 4: PLUGVERB (PLATE)',
+                        subtitles: ['Lush', 'stereo', 'depth', 'that', 'never', 'muddies', 'the', 'beat.'],
+                        pluginId: 'plugverb',
+                      },
+                      {
+                        sceneNumber: 6,
+                        durationSec: 3,
+                        headline: 'Full Studio Chain: Radio ready in 4 clicks.',
+                        visualAction: 'Finished vocal playing in full beat, link in bio overlay.',
+                        audioMode: 'wet',
+                        badgeText: 'FULL 4-PLUGIN CHAIN ACTIVE',
+                        subtitles: ['Grab', 'the', 'studio', 'pass.', 'Link', 'in', 'bio.'],
+                        pluginId: 'plugverb',
+                      },
+                    ],
+                  };
+                } else {
 
                 const pluginKey = isUnderground ? 'undergrnd' : isPlugChop ? 'plugchop' : isPlugVox ? 'plugvox' : 'plugtne';
                 const pluginTitle = isUnderground
@@ -403,6 +504,7 @@ When Dylan asks to create, generate, script, or brainstorm an ad, video ad, TikT
                     },
                   ],
                 };
+                }
               }
 
               if (candidateText.includes('[WRITTEN_BRIEFING]')) {

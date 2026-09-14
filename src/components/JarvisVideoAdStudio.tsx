@@ -17,6 +17,8 @@ import {
   Image as ImageIcon,
   Zap,
   X,
+  Layers,
+  Share2,
 } from 'lucide-react';
 
 export interface JarvisVideoScene {
@@ -24,9 +26,11 @@ export interface JarvisVideoScene {
   durationSec: number;
   headline: string;
   visualAction: string;
-  audioMode: 'dry' | 'wet' | 'beat';
+  audioMode: 'dry' | 'tuned' | 'wet' | 'beat';
   badgeText?: string;
   subtitles: string[];
+  pluginId?: string; // e.g. 'plugtne', 'plugeq', 'plugvox', 'plugverb'
+  pluginName?: string;
 }
 
 export interface JarvisVideoAd {
@@ -38,8 +42,11 @@ export interface JarvisVideoAd {
   aspectRatio?: '9:16' | '16:9';
   audioPair: 'vocal' | '808' | 'sample';
   audioDryUrl?: string;
+  audioTunedUrl?: string;
   audioWetUrl?: string;
   pluginImageUrl?: string;
+  isChainAd?: boolean;
+  chainPlugins?: Array<{ id: string; name: string }>;
   scenes: JarvisVideoScene[];
   callToAction?: string;
 }
@@ -69,10 +76,10 @@ const PLUGIN_IMAGE_MAP: Record<string, string> = {
   plugged1: '/images/plugins/Plugged1.png',
 };
 
-const DEFAULT_AUDIO_MAP: Record<'vocal' | '808' | 'sample', { dry: string; wet: string }> = {
-  vocal: { dry: '/audio/vocal_dry.wav', wet: '/audio/vocal_tuned.wav' },
-  808: { dry: '/audio/808_dry.wav', wet: '/audio/808_wet.wav' },
-  sample: { dry: '/audio/sample_dry.wav', wet: '/audio/sample_wet.wav' },
+const DEFAULT_AUDIO_MAP: Record<'vocal' | '808' | 'sample', { dry: string; tuned: string; wet: string }> = {
+  vocal: { dry: '/audio/vocal_dry.wav', tuned: '/audio/vocal_tuned.wav', wet: '/audio/vocal_wet.wav' },
+  808: { dry: '/audio/808_dry.wav', tuned: '/audio/808_wet.wav', wet: '/audio/808_wet.wav' },
+  sample: { dry: '/audio/sample_dry.wav', tuned: '/audio/sample_wet.wav', wet: '/audio/sample_wet.wav' },
 };
 
 export default function JarvisVideoAdStudio({ videoAd, onClose }: Props) {
@@ -88,8 +95,9 @@ export default function JarvisVideoAdStudio({ videoAd, onClose }: Props) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const animFrameRef = useRef<number | null>(null);
   const dryAudioRef = useRef<HTMLAudioElement | null>(null);
+  const tunedAudioRef = useRef<HTMLAudioElement | null>(null);
   const wetAudioRef = useRef<HTMLAudioElement | null>(null);
-  const pluginImgRef = useRef<HTMLImageElement | null>(null);
+  const imageCacheRef = useRef<Record<string, HTMLImageElement>>({});
 
   const scenes = videoAd.scenes && videoAd.scenes.length > 0 ? videoAd.scenes : [
     {
@@ -100,51 +108,56 @@ export default function JarvisVideoAdStudio({ videoAd, onClose }: Props) {
       audioMode: 'dry' as const,
       badgeText: 'BEFORE: RAW DEMO',
       subtitles: ['Stop', 'recording', 'off-key', 'vocals', 'in', 'FL', 'Studio.'],
+      pluginId: 'plugtne',
     },
     {
       sceneNumber: 2,
       durationSec: 4,
-      headline: `The Solution: ${videoAd.pluginName}`,
+      headline: `Step 1: ${videoAd.pluginName}`,
       visualAction: 'Plugin interface engaged with instant snap dial turned to 100%.',
-      audioMode: 'wet' as const,
-      badgeText: 'AFTER: PLUGTNE ENGAGED',
+      audioMode: 'tuned' as const,
+      badgeText: 'STEP 1: PLUGTNE 0MS SNAP',
       subtitles: ['One', 'click', 'and', 'the', 'pitch', 'locks', 'in', 'instantly.'],
+      pluginId: 'plugtne',
     },
     {
       sceneNumber: 3,
-      durationSec: 3,
-      headline: videoAd.callToAction || 'Get the sound at pluggedin.studio',
-      visualAction: 'Finished track waveform with link in bio overlay.',
+      durationSec: 4,
+      headline: 'Full Studio Chain: Radio Ready',
+      visualAction: 'All 4 plugins active in the mixer with final polish.',
       audioMode: 'wet' as const,
-      badgeText: 'RADIO READY',
+      badgeText: 'FULL VOCAL CHAIN (RADIO READY)',
       subtitles: ['Grab', 'yours', 'now', 'link', 'in', 'bio.'],
+      pluginId: 'plugverb',
     },
   ];
 
   const totalDuration = scenes.reduce((acc, s) => acc + s.durationSec, 0);
 
-  // Resolve authentic assets
-  const cleanId = (videoAd.pluginId || 'plugtne').toLowerCase().replace(/[^a-z0-9]/g, '');
-  const pluginImageSrc = videoAd.pluginImageUrl || PLUGIN_IMAGE_MAP[cleanId] || '/images/plugins/plugtne.png';
-  const audioPair = videoAd.audioPair || (cleanId.includes('808') || cleanId.includes('undergrnd') ? '808' : cleanId.includes('chop') ? 'sample' : 'vocal');
-  const dryAudioSrc = videoAd.audioDryUrl || DEFAULT_AUDIO_MAP[audioPair]?.dry || '/audio/vocal_dry.wav';
-  const wetAudioSrc = videoAd.audioWetUrl || DEFAULT_AUDIO_MAP[audioPair]?.wet || '/audio/vocal_tuned.wav';
-
-  // Preload plugin image
+  // Preload all 15 authentic plugin images
   useEffect(() => {
-    const img = new Image();
-    img.crossOrigin = 'anonymous';
-    img.src = pluginImageSrc;
-    img.onload = () => {
-      pluginImgRef.current = img;
-    };
-  }, [pluginImageSrc]);
+    Object.entries(PLUGIN_IMAGE_MAP).forEach(([key, src]) => {
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.src = src;
+      imageCacheRef.current[key] = img;
+    });
+  }, []);
 
-  // Preload audio elements
+  // Preload authentic audio elements
+  const audioPair = videoAd.audioPair || 'vocal';
+  const dryAudioSrc = videoAd.audioDryUrl || DEFAULT_AUDIO_MAP[audioPair]?.dry || '/audio/vocal_dry.wav';
+  const tunedAudioSrc = videoAd.audioTunedUrl || DEFAULT_AUDIO_MAP[audioPair]?.tuned || '/audio/vocal_tuned.wav';
+  const wetAudioSrc = videoAd.audioWetUrl || (videoAd.isChainAd ? '/audio/vocal_wet.wav' : DEFAULT_AUDIO_MAP[audioPair]?.wet || '/audio/vocal_wet.wav');
+
   useEffect(() => {
     dryAudioRef.current = new Audio(dryAudioSrc);
     dryAudioRef.current.loop = true;
     dryAudioRef.current.volume = 1.0;
+
+    tunedAudioRef.current = new Audio(tunedAudioSrc);
+    tunedAudioRef.current.loop = true;
+    tunedAudioRef.current.volume = 1.0;
 
     wetAudioRef.current = new Audio(wetAudioSrc);
     wetAudioRef.current.loop = true;
@@ -152,24 +165,32 @@ export default function JarvisVideoAdStudio({ videoAd, onClose }: Props) {
 
     return () => {
       dryAudioRef.current?.pause();
+      tunedAudioRef.current?.pause();
       wetAudioRef.current?.pause();
     };
-  }, [dryAudioSrc, wetAudioSrc]);
+  }, [dryAudioSrc, tunedAudioSrc, wetAudioSrc]);
 
-  // Manage Audio Switching between Dry and Wet based on active scene
+  // Manage Audio Switching between Dry, Tuned, and Wet (Full Chain)
   useEffect(() => {
     const activeScene = scenes[currentSceneIdx];
     if (!isPlaying) {
       dryAudioRef.current?.pause();
+      tunedAudioRef.current?.pause();
       wetAudioRef.current?.pause();
       return;
     }
 
     if (activeScene?.audioMode === 'dry') {
+      tunedAudioRef.current?.pause();
       wetAudioRef.current?.pause();
       dryAudioRef.current?.play().catch(() => {});
+    } else if (activeScene?.audioMode === 'tuned') {
+      dryAudioRef.current?.pause();
+      wetAudioRef.current?.pause();
+      tunedAudioRef.current?.play().catch(() => {});
     } else {
       dryAudioRef.current?.pause();
+      tunedAudioRef.current?.pause();
       wetAudioRef.current?.play().catch(() => {});
     }
   }, [isPlaying, currentSceneIdx, scenes]);
@@ -194,7 +215,7 @@ export default function JarvisVideoAdStudio({ videoAd, onClose }: Props) {
     return () => clearInterval(interval);
   }, [isPlaying, totalDuration]);
 
-  // Sync current scene index from currentTime
+  // Determine current active scene from currentTime
   useEffect(() => {
     let accumulated = 0;
     for (let i = 0; i < scenes.length; i++) {
@@ -225,7 +246,7 @@ export default function JarvisVideoAdStudio({ videoAd, onClose }: Props) {
     ctx.fillStyle = bgGrad;
     ctx.fillRect(0, 0, width, height);
 
-    // Subtle Grid Lines
+    // Subtle DAW Grid Lines
     ctx.strokeStyle = 'rgba(0, 240, 255, 0.04)';
     ctx.lineWidth = 1;
     const gridSize = 40;
@@ -242,71 +263,77 @@ export default function JarvisVideoAdStudio({ videoAd, onClose }: Props) {
       ctx.stroke();
     }
 
-    // Top Brand Badge
-    ctx.fillStyle = '#00f0ff';
-    ctx.font = 'bold 22px system-ui, -apple-system, sans-serif';
+    // Top Brand Badge & Chain Indicator
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 22px monospace';
     ctx.textAlign = 'center';
-    ctx.fillText('PLUGGEDIN AUDIO', width / 2, 60);
+    ctx.fillText('PLUGGEDIN AUDIO • STUDIO RIG', width / 2, 55);
 
-    // A/B Comparison Pill
+    // Scene Badge (e.g. BEFORE: RAW DEMO vs STEP 1: PLUGTNE 0MS vs FULL CHAIN)
     const isDry = activeScene.audioMode === 'dry';
-    const pillColor = isDry ? '#f43f5e' : '#10b981';
-    const pillText = activeScene.badgeText || (isDry ? 'A/B: BEFORE (RAW DEMO)' : 'A/B: AFTER (PLUGTNE ON)');
+    const isTuned = activeScene.audioMode === 'tuned';
+    const badgeText = activeScene.badgeText || (isDry ? 'BEFORE: RAW DEMO' : isTuned ? 'STEP 1: PLUGTNE' : 'AFTER: FULL CHAIN');
+
     ctx.save();
-    ctx.fillStyle = isDry ? 'rgba(244, 63, 94, 0.15)' : 'rgba(16, 185, 129, 0.15)';
-    ctx.strokeStyle = pillColor;
+    ctx.font = 'bold 24px system-ui, -apple-system, sans-serif';
+    const badgeW = ctx.measureText(badgeText).width + 48;
+    const badgeH = 48;
+    const badgeX = (width - badgeW) / 2;
+    const badgeY = 80;
+
+    ctx.fillStyle = isDry ? 'rgba(244, 63, 94, 0.2)' : isTuned ? 'rgba(0, 240, 255, 0.2)' : 'rgba(52, 211, 153, 0.2)';
+    ctx.strokeStyle = isDry ? '#f43f5e' : isTuned ? '#00f0ff' : '#34d399';
     ctx.lineWidth = 2;
-    const pillW = 340;
-    const pillH = 44;
-    const pillX = (width - pillW) / 2;
-    const pillY = 90;
     ctx.beginPath();
-    ctx.roundRect(pillX, pillY, pillW, pillH, 22);
+    ctx.roundRect(badgeX, badgeY, badgeW, badgeH, 24);
     ctx.fill();
     ctx.stroke();
 
-    ctx.fillStyle = pillColor;
-    ctx.font = 'bold 16px monospace';
-    ctx.fillText(pillText, width / 2, pillY + 28);
+    ctx.fillStyle = isDry ? '#f43f5e' : isTuned ? '#00f0ff' : '#34d399';
+    ctx.textAlign = 'center';
+    ctx.fillText(badgeText, width / 2, badgeY + 33);
     ctx.restore();
 
-    // Hook Headline (Upper Section)
+    // Scene Headline Text (High-contrast hook)
     ctx.fillStyle = '#ffffff';
-    ctx.font = '900 30px system-ui, -apple-system, sans-serif';
+    ctx.font = 'bold 32px system-ui, -apple-system, sans-serif';
     ctx.textAlign = 'center';
-    const headline = activeScene.headline;
-    wrapText(ctx, headline, width / 2, 190, width - 80, 38);
+    wrapText(ctx, activeScene.headline, width / 2, 175, width - 80, 42);
 
-    // Center Stage: Real Plugin GUI Photo
-    if (showPluginImage && pluginImgRef.current) {
-      const img = pluginImgRef.current;
-      const imgMaxW = width - 80;
-      const imgMaxH = height * 0.36;
-      let drawW = img.width || 400;
-      let drawH = img.height || 250;
-      const scale = Math.min(imgMaxW / drawW, imgMaxH / drawH, 1);
-      drawW = drawW * scale;
-      drawH = drawH * scale;
-      const drawX = (width - drawW) / 2;
-      const drawY = height * 0.33;
+    // Center Stage: Active Plugin GUI Photo (Switches automatically per scene!)
+    if (showPluginImage) {
+      const activePluginId = (activeScene.pluginId || videoAd.pluginId || 'plugtne').toLowerCase().replace(/[^a-z0-9]/g, '');
+      const img = imageCacheRef.current[activePluginId] || imageCacheRef.current['plugtne'];
 
-      // Glow behind plugin
-      ctx.save();
-      ctx.shadowColor = isDry ? 'rgba(244, 63, 94, 0.4)' : 'rgba(0, 240, 255, 0.5)';
-      ctx.shadowBlur = 30;
-      ctx.strokeStyle = isDry ? 'rgba(244, 63, 94, 0.6)' : 'rgba(0, 240, 255, 0.6)';
-      ctx.lineWidth = 3;
-      ctx.beginPath();
-      ctx.roundRect(drawX - 6, drawY - 6, drawW + 12, drawH + 12, 16);
-      ctx.stroke();
-      ctx.restore();
+      if (img && img.complete) {
+        const imgMaxW = width - 80;
+        const imgMaxH = height * 0.36;
+        let drawW = img.width || 400;
+        let drawH = img.height || 250;
+        const scale = Math.min(imgMaxW / drawW, imgMaxH / drawH, 1);
+        drawW = drawW * scale;
+        drawH = drawH * scale;
+        const drawX = (width - drawW) / 2;
+        const drawY = height * 0.33;
 
-      ctx.save();
-      ctx.beginPath();
-      ctx.roundRect(drawX, drawY, drawW, drawH, 12);
-      ctx.clip();
-      ctx.drawImage(img, drawX, drawY, drawW, drawH);
-      ctx.restore();
+        // Glow behind plugin
+        ctx.save();
+        ctx.shadowColor = isDry ? 'rgba(244, 63, 94, 0.4)' : isTuned ? 'rgba(0, 240, 255, 0.5)' : 'rgba(52, 211, 153, 0.5)';
+        ctx.shadowBlur = 30;
+        ctx.strokeStyle = isDry ? 'rgba(244, 63, 94, 0.6)' : isTuned ? 'rgba(0, 240, 255, 0.6)' : 'rgba(52, 211, 153, 0.6)';
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.roundRect(drawX - 6, drawY - 6, drawW + 12, drawH + 12, 16);
+        ctx.stroke();
+        ctx.restore();
+
+        ctx.save();
+        ctx.beginPath();
+        ctx.roundRect(drawX, drawY, drawW, drawH, 12);
+        ctx.clip();
+        ctx.drawImage(img, drawX, drawY, drawW, drawH);
+        ctx.restore();
+      }
     }
 
     // Dynamic Audio Waveform Spectrum Bars
@@ -327,9 +354,12 @@ export default function JarvisVideoAdStudio({ videoAd, onClose }: Props) {
       if (isDry) {
         barGrad.addColorStop(0, '#f43f5e');
         barGrad.addColorStop(1, '#9f1239');
-      } else {
+      } else if (isTuned) {
         barGrad.addColorStop(0, '#00f0ff');
         barGrad.addColorStop(1, '#2563eb');
+      } else {
+        barGrad.addColorStop(0, '#34d399');
+        barGrad.addColorStop(1, '#059669');
       }
       ctx.fillStyle = barGrad;
       ctx.beginPath();
@@ -352,7 +382,6 @@ export default function JarvisVideoAdStudio({ videoAd, onClose }: Props) {
 
       const subY = height * 0.85;
 
-      // Draw highlighted kinetic active word
       const activeWord = subtitles[wordIndex] || '';
       ctx.save();
       ctx.fillStyle = 'rgba(0, 0, 0, 0.75)';
@@ -360,7 +389,7 @@ export default function JarvisVideoAdStudio({ videoAd, onClose }: Props) {
       ctx.roundRect((width - 460) / 2, subY - 45, 460, 65, 16);
       ctx.fill();
 
-      ctx.fillStyle = '#facc15'; // Neon yellow highlight
+      ctx.fillStyle = '#facc15';
       ctx.shadowColor = 'rgba(250, 204, 21, 0.8)';
       ctx.shadowBlur = 15;
       ctx.fillText(`"${activeWord.toUpperCase()}"`, width / 2, subY);
@@ -406,7 +435,6 @@ export default function JarvisVideoAdStudio({ videoAd, onClose }: Props) {
       const stream = canvas.captureStream(30);
       let combinedStream = stream;
 
-      // Setup Web Audio recording if supported
       try {
         const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
         if (AudioContextClass && wetAudioRef.current) {
@@ -435,7 +463,7 @@ export default function JarvisVideoAdStudio({ videoAd, onClose }: Props) {
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `${cleanId}_TikTok_Ad_Official.webm`;
+        a.download = `${videoAd.pluginId}_Ad_Official.webm`;
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
@@ -465,6 +493,8 @@ export default function JarvisVideoAdStudio({ videoAd, onClose }: Props) {
     }
   };
 
+  const activeScene = scenes[currentSceneIdx] || scenes[0];
+
   return (
     <div className="w-full rounded-3xl border border-cyber-cyan/40 bg-gradient-to-b from-slate-900 via-slate-950 to-slate-950 p-4 sm:p-6 shadow-[0_0_50px_rgba(0,240,255,0.2)] my-4 text-left">
       {/* Studio Header Bar */}
@@ -477,7 +507,7 @@ export default function JarvisVideoAdStudio({ videoAd, onClose }: Props) {
             <div className="flex items-center space-x-2">
               <span className="text-sm font-black text-white">{videoAd.pluginName} Ad Studio</span>
               <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 font-bold">
-                100% Authentic Assets
+                100% Authentic C++ DSP
               </span>
             </div>
             <p className="text-xs text-slate-400 mt-0.5">
@@ -514,113 +544,138 @@ export default function JarvisVideoAdStudio({ videoAd, onClose }: Props) {
         </div>
       </div>
 
+      {/* Signal Chain Flow Bar (For Multi-Plugin / Vocal Chain Ads) */}
+      {(videoAd.isChainAd || videoAd.chainPlugins) && (
+        <div className="w-full bg-black/60 border border-white/10 rounded-2xl p-3 mb-4 flex items-center justify-between overflow-x-auto gap-2">
+          <div className="text-[11px] font-mono text-cyber-cyan font-bold uppercase tracking-wider shrink-0 flex items-center gap-1.5">
+            <Sliders className="w-3.5 h-3.5" />
+            <span>Vocal Chain Sequence:</span>
+          </div>
+          <div className="flex items-center gap-2 font-mono text-xs overflow-x-auto no-scrollbar">
+            {(videoAd.chainPlugins || [
+              { id: 'plugtne', name: '1. PLUGTNE' },
+              { id: 'plugeq', name: '2. PLUGEQ' },
+              { id: 'plugvox', name: '3. PLUGVOX' },
+              { id: 'plugverb', name: '4. PLUGVERB' },
+            ]).map((plug) => {
+              const isCurrent = activeScene?.pluginId === plug.id;
+              return (
+                <div
+                  key={plug.id}
+                  className={`px-3 py-1 rounded-xl border transition-all shrink-0 flex items-center gap-1.5 ${
+                    isCurrent
+                      ? 'bg-cyber-cyan text-black border-cyber-cyan font-bold shadow-[0_0_15px_rgba(0,240,255,0.6)] scale-105'
+                      : 'bg-slate-900 border-white/10 text-slate-400'
+                  }`}
+                >
+                  <span>{plug.name}</span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {/* Main Preview: Video Canvas + Timeline */}
       <div className="flex flex-col lg:flex-row items-center gap-6">
         {/* Render Canvas (9:16 Vertical TikTok Aspect Ratio) */}
         <div className="relative rounded-3xl overflow-hidden shadow-2xl border-2 border-cyber-cyan/30 bg-black shrink-0 max-w-[300px] sm:max-w-[320px] w-full aspect-[9/16]">
           <canvas
             ref={canvasRef}
-            width={540}
-            height={960}
-            className="w-full h-full object-contain"
+            width={720}
+            height={1280}
+            className="w-full h-full object-cover block"
           />
 
-          {/* Overlay Play Button when paused */}
+          {/* Overlay Play Indicator */}
           {!isPlaying && (
-            <button
-              type="button"
+            <div
               onClick={handlePlayToggle}
-              className="absolute inset-0 m-auto w-16 h-16 rounded-full bg-cyber-cyan/80 text-black flex items-center justify-center shadow-glow-cyan hover:scale-110 active:scale-95 transition-all"
+              className="absolute inset-0 bg-black/40 backdrop-blur-[2px] flex items-center justify-center cursor-pointer group transition-all"
             >
-              <Play className="w-7 h-7 fill-current ml-1" />
-            </button>
+              <div className="w-16 h-16 rounded-full bg-cyber-cyan/90 text-black flex items-center justify-center shadow-glow-cyan transform group-hover:scale-110 transition-all">
+                <Play className="w-8 h-8 fill-black ml-1" />
+              </div>
+            </div>
           )}
-
-          {/* Timecode overlay */}
-          <div className="absolute top-3 right-3 px-2 py-0.5 rounded-full bg-black/60 border border-slate-700 text-[10px] font-mono text-white">
-            {currentTime.toFixed(1)}s / {totalDuration.toFixed(1)}s
-          </div>
         </div>
 
-        {/* Storyboard Script & Scene Breakdown */}
-        <div className="flex-1 space-y-4 w-full">
-          <div>
-            <span className="text-[11px] font-mono uppercase text-cyber-cyan font-bold tracking-wider block mb-1">
-              🎯 Viral Hook Headline
-            </span>
-            <h4 className="text-base sm:text-lg font-black text-white leading-snug">
-              "{videoAd.hookHeadline}"
-            </h4>
+        {/* Right Side: Timeline Scenes & Export Controls */}
+        <div className="flex-1 w-full space-y-4">
+          {/* Active Audio Mode Indicator */}
+          <div className="flex items-center justify-between p-3 rounded-2xl bg-black/60 border border-slate-800 text-xs font-mono">
+            <div className="flex items-center space-x-2">
+              <span className="text-slate-400">Audio Mode:</span>
+              <span
+                className={`font-bold px-2 py-0.5 rounded-full ${
+                  activeScene.audioMode === 'dry'
+                    ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30'
+                    : activeScene.audioMode === 'tuned'
+                    ? 'bg-cyber-cyan/20 text-cyber-cyan border border-cyber-cyan/30'
+                    : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                }`}
+              >
+                {activeScene.audioMode === 'dry'
+                  ? 'Raw Demo (Dry)'
+                  : activeScene.audioMode === 'tuned'
+                  ? 'Signalsmith 0ms Snap'
+                  : 'Full 4-Plugin Chain'}
+              </span>
+            </div>
+            <div className="text-slate-400">
+              {currentTime.toFixed(1)}s / {totalDuration.toFixed(1)}s
+            </div>
           </div>
 
-          {/* Scene Carousel Selector */}
-          <div className="space-y-2">
-            <span className="text-[11px] font-mono uppercase text-slate-400 font-bold block">
-              🎬 4-Part TikTok Storyboard
-            </span>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-              {scenes.map((scene, idx) => (
+          {/* Scene Breakdown List */}
+          <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
+            {scenes.map((scene, idx) => {
+              const isCurrent = idx === currentSceneIdx;
+              return (
                 <div
                   key={idx}
                   onClick={() => {
-                    let acc = 0;
-                    for (let j = 0; j < idx; j++) acc += scenes[j].durationSec;
-                    setCurrentTime(acc);
+                    let seek = 0;
+                    for (let s = 0; s < idx; s++) seek += scenes[s].durationSec;
+                    setCurrentTime(seek);
                     setCurrentSceneIdx(idx);
                   }}
-                  className={`p-3 rounded-2xl border text-left cursor-pointer transition-all ${
-                    idx === currentSceneIdx
-                      ? 'bg-cyber-cyan/15 border-cyber-cyan text-white shadow-glow-cyan'
-                      : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white hover:border-slate-700'
+                  className={`p-3 rounded-2xl border transition-all cursor-pointer ${
+                    isCurrent
+                      ? 'bg-slate-900 border-cyber-cyan text-white shadow-md'
+                      : 'bg-slate-950/60 border-slate-800/80 text-slate-400 hover:border-slate-700'
                   }`}
                 >
-                  <div className="flex items-center justify-between text-[10px] font-mono font-bold mb-1">
-                    <span>Scene {scene.sceneNumber}</span>
-                    <span className={scene.audioMode === 'dry' ? 'text-rose-400' : 'text-emerald-400'}>
-                      {scene.audioMode === 'dry' ? 'DRY AUDIO' : 'PROCESSED'}
+                  <div className="flex items-center justify-between mb-1 text-xs">
+                    <span className="font-mono font-bold text-cyber-cyan">
+                      Scene {scene.sceneNumber}: {scene.badgeText || (scene.audioMode === 'dry' ? 'Dry' : 'Wet')}
                     </span>
+                    <span className="font-mono text-slate-500">{scene.durationSec}s</span>
                   </div>
-                  <h5 className="text-xs font-bold text-white line-clamp-1">{scene.headline}</h5>
-                  <p className="text-[10px] text-slate-400 line-clamp-2 mt-1">{scene.visualAction}</p>
+                  <p className="text-xs sm:text-sm font-semibold text-slate-200 line-clamp-1">
+                    {scene.headline}
+                  </p>
                 </div>
-              ))}
-            </div>
+              );
+            })}
           </div>
 
-          {/* Authentic Audio Stem Switcher */}
-          <div className="p-3.5 rounded-2xl bg-slate-950 border border-slate-800 flex items-center justify-between">
-            <div className="flex items-center space-x-2.5">
-              <div className="w-8 h-8 rounded-xl bg-purple-500/20 border border-purple-500/30 flex items-center justify-center text-purple-400">
-                <Volume2 className="w-4 h-4" />
-              </div>
-              <div>
-                <span className="text-xs font-bold text-white block">Real Audio Stem Demo</span>
-                <span className="text-[10px] font-mono text-slate-400">
-                  {audioPair === '808' ? 'Sub Bass Saturation Stem' : audioPair === 'sample' ? '16-Pad Sample Stem' : 'Lead Vocal Pitch Stem'}
-                </span>
-              </div>
-            </div>
-            <span className="text-xs font-mono font-bold px-2.5 py-1 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-400">
-              Verified Authentic
-            </span>
-          </div>
-
-          {/* Playback Controls & Download Button */}
-          <div className="flex flex-col sm:flex-row items-center gap-3 pt-2">
+          {/* Playback Controls & 1-Click Export */}
+          <div className="flex items-center gap-3 pt-2">
             <button
               type="button"
               onClick={handlePlayToggle}
-              className="w-full sm:w-auto px-6 py-3.5 rounded-2xl bg-slate-900 border border-slate-700 hover:border-cyber-cyan text-white font-bold text-xs uppercase tracking-wider flex items-center justify-center space-x-2 transition-all active:scale-95 shadow-md"
+              className="flex-1 py-3 px-4 rounded-2xl bg-cyber-cyan text-black font-black text-sm flex items-center justify-center space-x-2 shadow-glow-cyan hover:brightness-110 active:scale-95 transition-all"
             >
               {isPlaying ? (
                 <>
-                  <Pause className="w-4 h-4" />
-                  <span>Pause Ad</span>
+                  <Pause className="w-4 h-4 fill-black" />
+                  <span>Pause Preview</span>
                 </>
               ) : (
                 <>
-                  <Play className="w-4 h-4 fill-current" />
-                  <span>Play Ad Video</span>
+                  <Play className="w-4 h-4 fill-black" />
+                  <span>Play Video Ad</span>
                 </>
               )}
             </button>
@@ -628,37 +683,35 @@ export default function JarvisVideoAdStudio({ videoAd, onClose }: Props) {
             <button
               type="button"
               onClick={handleReplay}
-              className="w-full sm:w-auto px-4 py-3.5 rounded-2xl bg-slate-900 border border-slate-800 text-slate-400 hover:text-white text-xs font-bold flex items-center justify-center space-x-1.5 transition-all"
+              className="p-3 rounded-2xl bg-slate-800 text-slate-300 hover:text-white border border-slate-700 active:scale-95 transition-all"
+              title="Replay from beginning"
             >
               <RotateCcw className="w-4 h-4" />
-              <span>Replay</span>
             </button>
 
             <button
               type="button"
               onClick={handleExportVideo}
               disabled={isExporting}
-              className="w-full sm:flex-1 py-3.5 px-6 rounded-2xl bg-gradient-to-r from-cyber-cyan to-blue-600 text-black font-black text-xs uppercase tracking-wider shadow-glow-cyan hover:brightness-110 active:scale-98 transition-all disabled:opacity-50 flex items-center justify-center space-x-2"
+              className="py-3 px-4 rounded-2xl bg-emerald-500 hover:bg-emerald-400 text-black font-black text-sm flex items-center justify-center space-x-2 shadow-lg active:scale-95 transition-all disabled:opacity-50"
             >
-              {isExporting ? (
-                <span>Exporting Video ({exportProgress}%)...</span>
-              ) : exportSuccess ? (
-                <>
-                  <Check className="w-4 h-4" />
-                  <span>Downloaded!</span>
-                </>
-              ) : (
-                <>
-                  <Download className="w-4 h-4" />
-                  <span>Download Ad Video (MP4 / WebM)</span>
-                </>
-              )}
+              <Download className="w-4 h-4" />
+              <span>{isExporting ? `Rendering (${exportProgress}%)` : exportSuccess ? 'Exported!' : 'Download Video'}</span>
             </button>
           </div>
         </div>
       </div>
     </div>
   );
+}
+
+// Helpers
+function getSceneElapsed(time: number, scenes: JarvisVideoScene[], currentIdx: number): number {
+  let accum = 0;
+  for (let i = 0; i < currentIdx; i++) {
+    accum += scenes[i].durationSec;
+  }
+  return Math.max(0, time - accum);
 }
 
 function wrapText(
@@ -671,27 +724,18 @@ function wrapText(
 ) {
   const words = text.split(' ');
   let line = '';
-  let currentY = y;
 
   for (let n = 0; n < words.length; n++) {
     const testLine = line + words[n] + ' ';
     const metrics = ctx.measureText(testLine);
     const testWidth = metrics.width;
     if (testWidth > maxWidth && n > 0) {
-      ctx.fillText(line.trim(), x, currentY);
+      ctx.fillText(line, x, y);
       line = words[n] + ' ';
-      currentY += lineHeight;
+      y += lineHeight;
     } else {
       line = testLine;
     }
   }
-  ctx.fillText(line.trim(), x, currentY);
-}
-
-function getSceneElapsed(currentTime: number, scenes: JarvisVideoScene[], activeIdx: number): number {
-  let prevAccum = 0;
-  for (let i = 0; i < activeIdx; i++) {
-    prevAccum += scenes[i].durationSec;
-  }
-  return Math.max(0, currentTime - prevAccum);
+  ctx.fillText(line, x, y);
 }
