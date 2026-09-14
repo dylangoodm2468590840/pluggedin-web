@@ -44,6 +44,7 @@ import {
   Presentation,
   Video,
   RotateCcw,
+  Globe,
 } from 'lucide-react';
 import JarvisPresentationCanvas, { JarvisPresentationDeck } from '@/components/JarvisPresentationCanvas';
 import JarvisVideoAdStudio, { JarvisVideoAd } from '@/components/JarvisVideoAdStudio';
@@ -317,6 +318,8 @@ export default function FounderDashboardPage() {
     }
   }, []);
 
+  const [liveSiteConfig, setLiveSiteConfig] = useState<any>(null);
+  const [isRollingBackSite, setIsRollingBackSite] = useState(false);
   const [hasUnlockedAudio, setHasUnlockedAudio] = useState(false);
   const [latestSpeech, setLatestSpeech] = useState<string>(
     "Good afternoon Dylan. Systems are nominal. We are in stealth pre-launch staging with 2 active studio rigs running. What are we building today?"
@@ -622,7 +625,7 @@ export default function FounderDashboardPage() {
       setSpotlightTarget(null);
 
       if (confirmed) {
-        if (actionToRun?.type === 'modify_ui' && actionToRun.config) {
+        if ((actionToRun?.type === 'modify_ui' || actionToRun?.action === 'modify_ui') && actionToRun.config) {
           setDashboardConfig((prev) => {
             const updated = { ...prev, ...actionToRun.config };
             try {
@@ -630,10 +633,55 @@ export default function FounderDashboardPage() {
             } catch (_) {}
             return updated;
           });
+          setActionMessage(`✓ Confirmed & Executed: ${targetDesc}`);
+          speakJarvisVoice("Understood Dylan. Dashboard layout updated directly.");
+        } else if (actionToRun?.type === 'modify_site' || actionToRun?.action === 'modify_site') {
+          fetch('/api/site-config', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'x-founder-pin': pin || '8492',
+            },
+            body: JSON.stringify({ updates: actionToRun.updates, author: 'jarvis' }),
+          })
+            .then((r) => r.json())
+            .then((res) => {
+              if (res.success) {
+                setLiveSiteConfig(res.config);
+                setActionMessage(`✓ Live Website v${res.config.version} updated & verified!`);
+                speakJarvisVoice(`Published to the live website Dylan. Version ${res.config.version} is now active.`);
+              } else {
+                setActionMessage(`✕ Safeguard prevented update: ${res.error}`);
+                speakJarvisVoice(`Dylan, safeguard caught an issue: ${res.error}`);
+              }
+            })
+            .catch(() => {
+              setActionMessage('✕ Connection error updating website.');
+            });
+        } else if (actionToRun?.type === 'revert_site' || actionToRun?.action === 'revert_site') {
+          fetch('/api/site-config?action=revert', {
+            method: 'POST',
+            headers: { 'x-founder-pin': pin || '8492' },
+          })
+            .then((r) => r.json())
+            .then((res) => {
+              if (res.success) {
+                setLiveSiteConfig(res.config);
+                setActionMessage(`✓ Live Website reverted to snapshot v${res.config.version}`);
+                speakJarvisVoice(`Live website reverted Dylan. Version ${res.config.version} is restored.`);
+              } else {
+                setActionMessage(`✕ Rollback error: ${res.error}`);
+                speakJarvisVoice(`Could not rollback Dylan: ${res.error}`);
+              }
+            })
+            .catch(() => {
+              setActionMessage('✕ Connection error reverting website.');
+            });
+        } else {
+          setActionMessage(`✓ Confirmed & Executed: ${targetDesc}`);
+          speakJarvisVoice("Understood Dylan. Executed directly.");
         }
-        setActionMessage(`✓ Confirmed & Executed: ${targetDesc}`);
         setTimeout(() => setActionMessage(null), 5000);
-        speakJarvisVoice("Understood Dylan. Executed directly.");
       } else {
         setActionMessage("✕ Action cancelled by founder.");
         setTimeout(() => setActionMessage(null), 4000);
@@ -641,7 +689,7 @@ export default function FounderDashboardPage() {
       }
       return null;
     });
-  }, [speakJarvisVoice]);
+  }, [pin, speakJarvisVoice]);
 
 
   // Robust Dynamic Speech Recognition (Tap-to-Talk & Instant Interrupt)
@@ -743,13 +791,14 @@ export default function FounderDashboardPage() {
   const fetchMetrics = useCallback(async (selectedTimeframe = timeframe, pinCode = pin) => {
     setLoading(true);
     try {
-      const [res, sentinelRes] = await Promise.all([
+      const [res, sentinelRes, siteRes] = await Promise.all([
         fetch(`/api/founder/metrics?timeframe=${selectedTimeframe}`, {
           headers: { 'x-founder-pin': pinCode || '8492' },
         }),
         fetch('/api/founder/sentinel', {
           headers: { 'x-founder-pin': pinCode || '8492' },
         }).catch(() => null),
+        fetch('/api/site-config').catch(() => null),
       ]);
 
       if (res.ok) {
@@ -771,6 +820,13 @@ export default function FounderDashboardPage() {
         setSentinelData(sData);
         if (sData.activeDispatches) {
           setDispatches(sData.activeDispatches);
+        }
+      }
+
+      if (siteRes && siteRes.ok) {
+        const siteData = await siteRes.json();
+        if (siteData?.config) {
+          setLiveSiteConfig(siteData.config);
         }
       }
 
@@ -1936,7 +1992,19 @@ export default function FounderDashboardPage() {
         {activeTab === 'sentinel' && (
           <div className="space-y-6">
             {/* Sentinel Status Banner */}
-            <div className="bg-slate-900/80 border border-emerald-500/30 rounded-3xl p-6 relative overflow-hidden">
+            <div
+              id="card-sentinel-status"
+              className={`bg-slate-900/80 border border-emerald-500/30 rounded-3xl p-6 relative overflow-hidden transition-all duration-500 ${
+                spotlightTarget === 'card-sentinel-status'
+                  ? 'ring-4 ring-cyber-cyan shadow-[0_0_50px_rgba(0,240,255,0.8)] scale-[1.01] z-30'
+                  : ''
+              }`}
+            >
+              {spotlightTarget === 'card-sentinel-status' && (
+                <div className="absolute top-2 right-2 px-2.5 py-0.5 rounded-full bg-cyber-cyan text-black font-mono font-black text-[10px] shadow-glow-cyan flex items-center gap-1 animate-pulse">
+                  <span>[ ── ⊕ ── ]</span> <span>{spotlightCaption || 'SENTINEL ISOLATED'}</span>
+                </div>
+              )}
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div className="flex items-center space-x-3">
                   <div className="w-12 h-12 rounded-2xl bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center">
@@ -1957,7 +2025,178 @@ export default function FounderDashboardPage() {
 
                 <div className="text-right">
                   <span className="text-xs font-mono text-slate-400">Diagnostics Scan</span>
-                  <div className="text-sm font-bold text-emerald-400 font-mono">0 Critical Errors</div>
+                  <div className="text-sm font-bold text-emerald-400 font-mono">
+                    {sentinelData?.alarms?.length ? `${sentinelData.alarms.length} Bottlenecks` : '0 Critical Errors'}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Active Problem Sentinel Alarms */}
+            {sentinelData?.alarms && sentinelData.alarms.length > 0 ? (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-xs font-mono uppercase tracking-wider text-amber-400 font-bold flex items-center space-x-2">
+                    <AlertCircle className="w-4 h-4 text-amber-400" />
+                    <span>Active Sentinel Bottlenecks Detected ({sentinelData.alarms.length})</span>
+                  </h3>
+                  <button
+                    onClick={() => handleSendAiPrompt("Jarvis, explain the active sentinel issues and tell me the unvarnished truth on how we fix them.")}
+                    className="text-xs font-mono text-cyan-400 hover:underline flex items-center space-x-1"
+                  >
+                    <span>J.A.R.V.I.S. Deep Analysis</span>
+                    <ArrowUpRight className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+                {sentinelData.alarms.map((alarm: any) => (
+                  <div
+                    key={alarm.id}
+                    className={`p-4 rounded-2xl border flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
+                      alarm.level === 'critical'
+                        ? 'bg-rose-500/10 border-rose-500/30 text-rose-200'
+                        : alarm.level === 'warning'
+                        ? 'bg-amber-500/10 border-amber-500/30 text-amber-200'
+                        : 'bg-cyan-500/10 border-cyan-500/30 text-cyan-200'
+                    }`}
+                  >
+                    <div>
+                      <div className="flex items-center space-x-2">
+                        <span className="text-xs font-black uppercase tracking-wider">{alarm.title}</span>
+                        <span className="text-[10px] font-mono px-2 py-0.5 rounded uppercase font-bold bg-black/40">
+                          {alarm.level}
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-300 mt-1">{alarm.summary}</p>
+                      <p className="text-[11px] text-slate-400 font-mono mt-0.5">Recommended: {alarm.suggestedAction}</p>
+                    </div>
+                    <button
+                      onClick={() => handleSendAiPrompt(`Jarvis, take immediate action on ${alarm.title}: ${alarm.suggestedAction}`)}
+                      className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs shrink-0 active:scale-95 transition-all"
+                    >
+                      Resolve with J.A.R.V.I.S.
+                    </button>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-between text-xs text-emerald-300 font-mono">
+                <div className="flex items-center space-x-2">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                  <span>Sentinel Sweep: All payment gateways, DRM activation limits, and store routes verified healthy.</span>
+                </div>
+                <span className="text-[10px] bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded font-bold">0 Bottlenecks</span>
+              </div>
+            )}
+
+            {/* LIVE WEBSITE STOREFRONT CONTROL & INSTANT ROLLBACK */}
+            <div
+              id="site-storefront-control"
+              className={`bg-slate-900/80 border border-slate-800 rounded-3xl p-6 space-y-4 relative transition-all duration-500 ${
+                spotlightTarget === 'site-storefront-control'
+                  ? 'ring-4 ring-cyber-cyan shadow-[0_0_50px_rgba(0,240,255,0.8)] scale-[1.01] z-30'
+                  : ''
+              }`}
+            >
+              {spotlightTarget === 'site-storefront-control' && (
+                <div className="absolute top-2 right-2 px-2.5 py-0.5 rounded-full bg-cyber-cyan text-black font-mono font-black text-[10px] shadow-glow-cyan flex items-center gap-1 animate-pulse">
+                  <span>[ ── ⊕ ── ]</span> <span>{spotlightCaption || 'STOREFRONT CONTROL'}</span>
+                </div>
+              )}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-800">
+                <div className="flex items-center space-x-3">
+                  <div className="w-10 h-10 rounded-2xl bg-cyan-500/20 border border-cyber-cyan/40 flex items-center justify-center text-cyber-cyan shadow-glow-cyan">
+                    <Globe className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <div className="flex items-center space-x-2">
+                      <h3 className="text-sm font-black text-white">Live Storefront Website Control</h3>
+                      <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyber-cyan border border-cyan-500/30 font-bold">
+                        v{liveSiteConfig?.version || 1} LIVE
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-400">
+                      Safeguarded dynamic management of hero headline, scarcity banner, and promos
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center space-x-2">
+                  <button
+                    type="button"
+                    disabled={isRollingBackSite}
+                    onClick={async () => {
+                      if (!confirm("Rollback live website to previous snapshot?")) return;
+                      setIsRollingBackSite(true);
+                      try {
+                        const res = await fetch('/api/site-config?action=revert', {
+                          method: 'POST',
+                          headers: { 'x-founder-pin': pin || '8492' }
+                        });
+                        const data = await res.json();
+                        if (data.success) {
+                          setLiveSiteConfig(data.config);
+                          setActionMessage(`✓ Website reverted to v${data.config.version}`);
+                          setTimeout(() => setActionMessage(null), 4000);
+                          speakJarvisVoice(`Website reverted to previous snapshot Dylan. Version ${data.config.version} is now live.`);
+                        } else {
+                          alert(data.error || 'Rollback failed');
+                        }
+                      } catch (err: any) {
+                        alert(err.message);
+                      } finally {
+                        setIsRollingBackSite(false);
+                      }
+                    }}
+                    className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-mono font-bold active:scale-95 transition-all flex items-center space-x-1.5"
+                    title="1-Tap Instant Rollback to previous configuration"
+                  >
+                    <RotateCcw className={`w-3.5 h-3.5 ${isRollingBackSite ? 'animate-spin' : ''}`} />
+                    <span>1-Tap Rollback</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleSendAiPrompt("Jarvis, stage a new pre-launch announcement banner offering 20% off for early producers.")}
+                    className="px-3.5 py-2 rounded-xl bg-cyber-cyan text-black font-black text-xs shadow-glow-cyan hover:brightness-110 active:scale-95 transition-all flex items-center space-x-1.5"
+                  >
+                    <Sparkles className="w-3.5 h-3.5" />
+                    <span>AI Staging</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Storefront Snapshot Card */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="p-4 rounded-2xl bg-slate-950/60 border border-slate-800 space-y-2">
+                  <span className="text-[10px] font-mono uppercase tracking-wider text-slate-400 font-bold block">
+                    Active Hero Headline
+                  </span>
+                  <p className="text-sm font-bold text-white">
+                    {liveSiteConfig?.hero?.headlineStart || "Studio-Grade Plugins Built for"}{' '}
+                    <span className="text-cyber-cyan">
+                      {liveSiteConfig?.hero?.headlineGradient || "Modern Hitmakers."}
+                    </span>
+                  </p>
+                  <p className="text-xs text-slate-400 line-clamp-2">
+                    {liveSiteConfig?.hero?.subheadline || "From PlugChop 16-pad playable sampler to zero-latency pitch correction."}
+                  </p>
+                </div>
+
+                <div className="p-4 rounded-2xl bg-slate-950/60 border border-slate-800 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-mono uppercase tracking-wider text-slate-400 font-bold">
+                      Announcement Banner
+                    </span>
+                    <span className={`text-[10px] font-mono px-2 py-0.5 rounded-full font-bold ${liveSiteConfig?.banner?.enabled ? 'bg-emerald-500/20 text-emerald-400' : 'bg-slate-800 text-slate-500'}`}>
+                      {liveSiteConfig?.banner?.enabled ? 'ACTIVE ON HOMEPAGE' : 'MUTED'}
+                    </span>
+                  </div>
+                  <p className="text-xs font-semibold text-slate-200">
+                    {liveSiteConfig?.banner?.text || "FOUNDER'S PASS: Only 12 of 100 spots left @ $14.99/mo"}
+                  </p>
+                  <p className="text-[10px] font-mono text-cyan-400">
+                    Link: {liveSiteConfig?.banner?.ctaLink || "/pricing"} • Style: {liveSiteConfig?.banner?.style || "cyan"}
+                  </p>
                 </div>
               </div>
             </div>

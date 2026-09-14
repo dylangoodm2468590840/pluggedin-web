@@ -6,6 +6,34 @@ import { Sparkles, Download, ArrowRight, Flame, CheckCircle2, Sliders, Music, Za
 import { FOUNDERS_SPOTS_REMAINING, FOUNDERS_SPOTS_TOTAL, TOTAL_CATALOG_VALUE } from '../data/plugins';
 
 export const Hero: React.FC = () => {
+  const [siteConfig, setSiteConfig] = React.useState<any>(null);
+
+  React.useEffect(() => {
+    fetch('/api/site-config')
+      .then((res) => res.json())
+      .then((data) => {
+        if (data?.config) setSiteConfig(data.config);
+      })
+      .catch(() => {});
+  }, []);
+
+  const banner = siteConfig?.banner;
+  const hero = siteConfig?.hero;
+
+  const showBanner = banner ? banner.enabled : true;
+  const bannerText = banner?.text || `Only ${FOUNDERS_SPOTS_REMAINING} of ${FOUNDERS_SPOTS_TOTAL} spots left @ $14.99/mo`;
+  const bannerLink = banner?.ctaLink || '/pricing';
+
+  const headlineStart = hero?.headlineStart || 'Studio-Grade Plugins Built for ';
+  const headlineGradient = hero?.headlineGradient || 'Modern Hitmakers.';
+  const subheadline =
+    hero?.subheadline ||
+    'From the new PlugChop 16-pad playable sampler to zero-latency pitch correction and analog tube heat. 15 plugins engineered natively for FL Studio, Pro Tools, Logic Pro, and Ableton.';
+  const primaryCtaText = hero?.primaryCtaText || 'Download PluggedIN Central (Free)';
+  const primaryCtaLink = hero?.primaryCtaLink || '/download';
+  const secondaryCtaText = hero?.secondaryCtaText || 'Get All-Access Pass • $14.99';
+  const secondaryCtaLink = hero?.secondaryCtaLink || '/pricing';
+
   return (
     <section className="relative pt-12 pb-24 overflow-hidden">
       {/* Background Ambient Glows */}
@@ -14,50 +42,52 @@ export const Hero: React.FC = () => {
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
         {/* Scarcity Founder Banner */}
-        <div className="flex justify-center mb-8">
-          <Link
-            href="/pricing"
-            className="inline-flex items-center space-x-2.5 px-4 py-1.5 rounded-full bg-studio-900/90 border border-cyber-cyan/30 text-xs text-slate-300 shadow-glow-cyan hover:border-cyber-cyan/60 transition-all group"
-          >
-            <span className="flex h-2 w-2 relative">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyber-cyan opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-cyber-cyan"></span>
-            </span>
-            <span className="font-extrabold text-white">FOUNDER&apos;S PASS:</span>
-            <span className="text-slate-300">Only <strong className="text-cyber-cyan">{FOUNDERS_SPOTS_REMAINING} of {FOUNDERS_SPOTS_TOTAL}</strong> spots left @ $14.99/mo</span>
-            <ArrowRight className="w-3.5 h-3.5 text-cyber-cyan group-hover:translate-x-0.5 transition-transform" />
-          </Link>
-        </div>
+        {showBanner && (
+          <div className="flex justify-center mb-8" id="site-announcement-banner">
+            <Link
+              href={bannerLink}
+              className="inline-flex items-center space-x-2.5 px-4 py-1.5 rounded-full bg-studio-900/90 border border-cyber-cyan/30 text-xs text-slate-300 shadow-glow-cyan hover:border-cyber-cyan/60 transition-all group"
+            >
+              <span className="flex h-2 w-2 relative">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyber-cyan opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-cyber-cyan"></span>
+              </span>
+              <span className="font-extrabold text-white">FOUNDER&apos;S PASS:</span>
+              <span className="text-slate-300">{bannerText}</span>
+              <ArrowRight className="w-3.5 h-3.5 text-cyber-cyan group-hover:translate-x-0.5 transition-transform" />
+            </Link>
+          </div>
+        )}
 
         {/* Main Headline */}
-        <div className="text-center max-w-4xl mx-auto space-y-6">
+        <div className="text-center max-w-4xl mx-auto space-y-6" id="site-hero-headline">
           <h1 className="text-4xl sm:text-6xl lg:text-7xl font-black tracking-tight text-white leading-[1.1]">
-            Studio-Grade Plugins Built for{' '}
+            {headlineStart}{' '}
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyber-cyan via-sky-400 to-cyber-purple">
-              Modern Hitmakers.
+              {headlineGradient}
             </span>
           </h1>
 
           <p className="text-base sm:text-xl text-slate-300 max-w-2xl mx-auto font-normal leading-relaxed">
-            From the new <strong>PlugChop 16-pad playable sampler</strong> to zero-latency pitch correction and analog tube heat. 15 plugins engineered natively for FL Studio, Pro Tools, Logic Pro, and Ableton.
+            {subheadline}
           </p>
 
           {/* Action CTAs */}
           <div className="pt-4 flex flex-col sm:flex-row items-center justify-center gap-4">
             <Link
-              href="/download"
+              href={primaryCtaLink}
               className="w-full sm:w-auto px-8 py-4 rounded-2xl bg-gradient-to-r from-cyber-cyan to-blue-600 text-black text-sm font-black shadow-glow-cyan hover:brightness-110 active:scale-95 transition-all flex items-center justify-center space-x-2"
             >
               <Download className="w-5 h-5" />
-              <span>Download PluggedIN Central (Free)</span>
+              <span>{primaryCtaText}</span>
             </Link>
 
             <Link
-              href="/pricing"
+              href={secondaryCtaLink}
               className="w-full sm:w-auto px-8 py-4 rounded-2xl bg-studio-900 border border-white/10 text-white text-sm font-bold hover:bg-studio-850 hover:border-white/20 transition-all flex items-center justify-center space-x-2"
             >
               <Sparkles className="w-5 h-5 text-cyber-purple" />
-              <span>Get All-Access Pass • $14.99</span>
+              <span>{secondaryCtaText}</span>
             </Link>
           </div>
 
