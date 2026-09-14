@@ -19,11 +19,25 @@ function getRedis(): any {
   return null;
 }
 
+const ADMIN_SECRET = process.env.ADMIN_SECRET_KEY || 'PLUGGEDIN_SECURE_ADMIN_DYLAN_8492_KEY';
+
+function isAuthorized(req: NextRequest): boolean {
+  const authHeader = req.headers.get('authorization')?.replace(/^Bearer\s+/i, '');
+  const adminKey = req.headers.get('x-admin-key');
+  return authHeader === ADMIN_SECRET || adminKey === ADMIN_SECRET;
+}
+
 export async function GET(req: NextRequest) {
+  if (!isAuthorized(req)) {
+    return NextResponse.json({ error: 'Not Found' }, { status: 404 });
+  }
   return handleCleanup();
 }
 
 export async function POST(req: NextRequest) {
+  if (!isAuthorized(req)) {
+    return NextResponse.json({ error: 'Not Found' }, { status: 404 });
+  }
   let deleteEmail: string | undefined;
   try {
     const body = await req.json();
@@ -34,6 +48,13 @@ export async function POST(req: NextRequest) {
 
 async function handleCleanup(deleteEmail?: string) {
   try {
+    // Permanent safeguard: dylangoodm@gmail.com can NEVER be deleted
+    if (deleteEmail && deleteEmail.trim().toLowerCase() === 'dylangoodm@gmail.com') {
+      return NextResponse.json(
+        { success: false, error: 'Founder account cannot be modified or deleted.' },
+        { status: 403 }
+      );
+    }
     const redis = getRedis();
     let currentUsers: UserRecord[] = [];
 
