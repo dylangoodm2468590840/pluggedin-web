@@ -37,6 +37,8 @@ import {
   Terminal,
   Sliders,
   X,
+  Check,
+  Eye,
   MessageSquare,
   Flame,
   Presentation,
@@ -195,6 +197,13 @@ export default function FounderDashboardPage() {
     } catch (_) {}
   }, []);
 
+  // Interactive Intent Verification & Confirmation State ("Is this what you're talking about, Dylan?")
+  const [pendingConfirmation, setPendingConfirmation] = useState<{
+    targetId: string;
+    pendingAction: any;
+    caption: string;
+    question: string;
+  } | null>(null);
 
   // JARVIS Voice Engine & Mobile state
   const [isVoiceEnabled, setIsVoiceEnabled] = useState(true);
@@ -604,6 +613,36 @@ export default function FounderDashboardPage() {
     };
   }, [isAuthenticated, hasPlayedStartupBriefing, unlockAudioOnTouch, playStartupBriefing]);
 
+  // Autonomous Intent Verification Resolver ("Is this what you're talking about, Dylan?")
+  const executePendingConfirmation = useCallback((confirmed: boolean) => {
+    setPendingConfirmation((current) => {
+      if (!current) return null;
+      const actionToRun = current.pendingAction;
+      const targetDesc = current.caption || 'Action';
+      setSpotlightTarget(null);
+
+      if (confirmed) {
+        if (actionToRun?.type === 'modify_ui' && actionToRun.config) {
+          setDashboardConfig((prev) => {
+            const updated = { ...prev, ...actionToRun.config };
+            try {
+              localStorage.setItem('pluggedin_dashboard_config', JSON.stringify(updated));
+            } catch (_) {}
+            return updated;
+          });
+        }
+        setActionMessage(`✓ Confirmed & Executed: ${targetDesc}`);
+        setTimeout(() => setActionMessage(null), 5000);
+        speakJarvisVoice("Understood Dylan. Executed directly.");
+      } else {
+        setActionMessage("✕ Action cancelled by founder.");
+        setTimeout(() => setActionMessage(null), 4000);
+        speakJarvisVoice("Understood. Action cancelled, Dylan.");
+      }
+      return null;
+    });
+  }, [speakJarvisVoice]);
+
 
   // Robust Dynamic Speech Recognition (Tap-to-Talk & Instant Interrupt)
   const toggleMic = async () => {
@@ -918,6 +957,21 @@ export default function FounderDashboardPage() {
     unlockAudioOnTouch();
     triggerHaptic(15);
 
+    // Fast-path hands-free affirmation/cancellation check for pending verification
+    if (pendingConfirmation) {
+      const qLower = query.toLowerCase().trim();
+      const isAffirmative = /^(yes|yeah|yep|yup|sure|do it|go ahead|confirm|correct|that's it|thats it|do that|please do|ok|okay|bet)\b/.test(qLower);
+      const isNegative = /^(no|nope|nah|cancel|stop|dont|don't|not that|leave it|nevermind)\b/.test(qLower);
+
+      if (isAffirmative) {
+        executePendingConfirmation(true);
+        return;
+      } else if (isNegative) {
+        executePendingConfirmation(false);
+        return;
+      }
+    }
+
     
     let uploadedAudioUrl = '';
     let uploadedAudioName = '';
@@ -983,7 +1037,24 @@ export default function FounderDashboardPage() {
 
         if (data.hudAction) {
           const action = data.hudAction;
-          if (action.action === 'modify_ui' && action.config) {
+          if (action.action === 'verify_intent') {
+            setPendingConfirmation({
+              targetId: action.targetId,
+              pendingAction: action.pendingAction,
+              caption: action.caption || 'CONFIRMATION REQUIRED',
+              question: action.question || "Dylan, is this what you'd like me to change?",
+            });
+            if (action.targetId) {
+              setSpotlightTarget(action.targetId);
+              setSpotlightCaption(action.caption || 'CONFIRM TARGET');
+              setTimeout(() => {
+                const el = document.getElementById(action.targetId);
+                if (el) {
+                  el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }
+              }, 300);
+            }
+          } else if (action.action === 'modify_ui' && action.config) {
             setDashboardConfig((prev) => {
               const updated = { ...prev, ...action.config };
               try {
@@ -1199,12 +1270,19 @@ export default function FounderDashboardPage() {
                 <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
               </span>
             </div>
-            <div>
+            <div
+              id="founder-header-controls"
+              className={`transition-all rounded-2xl p-1.5 ${
+                spotlightTarget === 'founder-header-controls' || spotlightTarget === 'header-chat-buttons'
+                  ? 'ring-4 ring-amber-400 bg-amber-500/15 shadow-[0_0_40px_rgba(251,191,36,0.7)] animate-pulse'
+                  : ''
+              }`}
+            >
               <div className="flex items-center space-x-2">
 
                 {/* Dynamic New Chat & History Buttons (Controlled by Jarvis voice & dashboardConfig) */}
                 {dashboardConfig.showChatButtons && (
-                  <div className="flex items-center gap-2">
+                  <div id="header-chat-buttons" className="flex items-center gap-2">
                     <button
                       type="button"
                       onClick={startNewChat}
@@ -1313,8 +1391,13 @@ export default function FounderDashboardPage() {
 
           <div className="flex items-center space-x-2">
             <button
+              id="btn-purge-test-sales"
               onClick={handlePurgeTestOrders}
-              className="px-3 py-1.5 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 hover:bg-rose-500/20 text-xs font-semibold flex items-center space-x-1.5 transition-all"
+              className={`px-3 py-1.5 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 hover:bg-rose-500/20 text-xs font-semibold flex items-center space-x-1.5 transition-all ${
+                spotlightTarget === 'btn-purge-test-sales'
+                  ? 'ring-4 ring-rose-500 shadow-[0_0_30px_rgba(244,63,94,0.8)] animate-pulse'
+                  : ''
+              }`}
               title="Remove test simulated orders and restore 100% genuine ledger"
             >
               <Trash2 className="w-3.5 h-3.5 text-rose-400" />
@@ -1330,95 +1413,111 @@ export default function FounderDashboardPage() {
           </div>
         </div>
 
-        {/* Executive KPI Hero Grid */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-          {/* 1. True Net Take-Home Profit (Hero) */}
-          <div className="col-span-2 sm:col-span-1 bg-gradient-to-br from-slate-900 via-slate-900 to-emerald-950/40 border border-emerald-500/30 rounded-3xl p-5 shadow-xl relative overflow-hidden">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-mono uppercase tracking-wider text-emerald-400 font-bold flex items-center space-x-1.5">
-                <DollarSign className="w-4 h-4" />
-                <span>True Net Take-Home</span>
-              </span>
-              <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-bold">
-                {fin?.marginPct || 0}% Keep Rate
-              </span>
-            </div>
-            <div className="text-3xl sm:text-4xl font-black tracking-tight text-white mt-1">
-              ${(fin?.netTotal || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-            </div>
-            <p className="text-[11px] text-slate-400 mt-2">
-              Exact PayPal balance deposited after all fees & taxes.
-            </p>
-          </div>
-
-          {/* 2. Gross Sales & Fee Breakdown */}
-          <div className="bg-slate-900/80 border border-slate-800 rounded-3xl p-5 shadow-lg relative">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-mono uppercase tracking-wider text-slate-400 font-bold flex items-center space-x-1.5">
-                <CreditCard className="w-4 h-4 text-blue-400" />
-                <span>Gross Checkout</span>
-              </span>
-              <span className="text-[10px] font-mono text-rose-400 flex items-center">
-                -${(fin?.feeTotal || 0).toFixed(2)} fees
-              </span>
-            </div>
-            <div className="text-2xl sm:text-3xl font-black tracking-tight text-white mt-1">
-              ${(fin?.grossTotal || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-            </div>
-            <p className="text-[11px] text-slate-400 mt-2">
-              Across {fin?.completedOrdersCount || 0} customer transactions.
-            </p>
-          </div>
-
-          {/* 3. Subscriptions & MRR */}
-          <div id="metric-mrr" className={`bg-slate-900/80 border border-slate-800 rounded-3xl p-5 shadow-lg relative transition-all duration-500 ${spotlightTarget === 'metric-mrr' ? 'ring-4 ring-cyber-cyan shadow-[0_0_50px_rgba(0,240,255,0.8)] scale-[1.02] z-30' : ''}`}>
-            {spotlightTarget === 'metric-mrr' && (
-              <div className="absolute top-2 right-2 px-2.5 py-0.5 rounded-full bg-cyber-cyan text-black font-mono font-black text-[10px] shadow-glow-cyan flex items-center gap-1 animate-pulse">
-                <span>[ ── ⊕ ── ]</span> <span>{spotlightCaption || 'ISOLATED'}</span>
+        {/* Executive KPI Hero Grid (Controlled by Jarvis voice & dashboardConfig) */}
+        {dashboardConfig.showTopStats && (
+          <div
+            id="founder-top-stats"
+            className={`grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 rounded-3xl p-1 transition-all ${
+              spotlightTarget === 'founder-top-stats'
+                ? 'ring-4 ring-amber-400 bg-amber-500/10 shadow-[0_0_50px_rgba(251,191,36,0.7)] animate-pulse'
+                : ''
+            }`}
+          >
+            {/* 1. True Net Take-Home Profit (Hero) */}
+            <div
+              id="metric-net-sales"
+              className={`col-span-2 sm:col-span-1 bg-gradient-to-br from-slate-900 via-slate-900 to-emerald-950/40 border border-emerald-500/30 rounded-3xl p-5 shadow-xl relative overflow-hidden transition-all duration-500 ${
+                spotlightTarget === 'metric-net-sales'
+                  ? 'ring-4 ring-cyber-cyan shadow-[0_0_50px_rgba(0,240,255,0.8)] scale-[1.02] z-30'
+                  : ''
+              }`}
+            >
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-mono uppercase tracking-wider text-emerald-400 font-bold flex items-center space-x-1.5">
+                  <DollarSign className="w-4 h-4" />
+                  <span>True Net Take-Home</span>
+                </span>
+                <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-bold">
+                  {fin?.marginPct || 0}% Keep Rate
+                </span>
               </div>
-            )}
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-mono uppercase tracking-wider text-purple-400 font-bold flex items-center space-x-1.5">
-                <RefreshCw className="w-4 h-4" />
-                <span>MRR (Monthly)</span>
-              </span>
-              <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 font-bold">
-                {subs?.activeSubscribersCount || 0} active
-              </span>
-            </div>
-            <div className="text-2xl sm:text-3xl font-black tracking-tight text-white mt-1">
-              ${(subs?.mrr || 0).toFixed(2)}
-              <span className="text-xs text-slate-400 font-normal">/mo</span>
-            </div>
-            <p className="text-[11px] text-slate-400 mt-2">
-              Projected ARR: ${(subs?.arr || 0).toFixed(2)} • 0% Churn
-            </p>
-          </div>
-
-          {/* 4. Traffic & Conversion Funnel */}
-          <div id="metric-active-subs" className={`bg-slate-900/80 border border-slate-800 rounded-3xl p-5 shadow-lg relative transition-all duration-500 ${spotlightTarget === 'metric-active-subs' ? 'ring-4 ring-cyber-cyan shadow-[0_0_50px_rgba(0,240,255,0.8)] scale-[1.02] z-30' : ''}`}>
-            {spotlightTarget === 'metric-active-subs' && (
-              <div className="absolute top-2 right-2 px-2.5 py-0.5 rounded-full bg-cyber-cyan text-black font-mono font-black text-[10px] shadow-glow-cyan flex items-center gap-1 animate-pulse">
-                <span>[ ── ⊕ ── ]</span> <span>{spotlightCaption || 'ISOLATED'}</span>
+              <div className="text-3xl sm:text-4xl font-black tracking-tight text-white mt-1">
+                ${(fin?.netTotal || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </div>
-            )}
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-mono uppercase tracking-wider text-cyber-cyan font-bold flex items-center space-x-1.5">
-                <Users className="w-4 h-4" />
-                <span>Conversion Rate</span>
-              </span>
-              <span className="text-[10px] font-mono text-slate-400">
-                {traf?.totalViews || 0} visits
-              </span>
+              <p className="text-[11px] text-slate-400 mt-2">
+                Exact PayPal balance deposited after all fees & taxes.
+              </p>
             </div>
-            <div className="text-2xl sm:text-3xl font-black tracking-tight text-white mt-1">
-              {traf?.conversionRatePct || '0.00'}%
+
+            {/* 2. Gross Sales & Fee Breakdown */}
+            <div className="bg-slate-900/80 border border-slate-800 rounded-3xl p-5 shadow-lg relative">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-mono uppercase tracking-wider text-slate-400 font-bold flex items-center space-x-1.5">
+                  <CreditCard className="w-4 h-4 text-blue-400" />
+                  <span>Gross Checkout</span>
+                </span>
+                <span className="text-[10px] font-mono text-rose-400 flex items-center">
+                  -${(fin?.feeTotal || 0).toFixed(2)} fees
+                </span>
+              </div>
+              <div className="text-2xl sm:text-3xl font-black tracking-tight text-white mt-1">
+                ${(fin?.grossTotal || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </div>
+              <p className="text-[11px] text-slate-400 mt-2">
+                Across {fin?.completedOrdersCount || 0} customer transactions.
+              </p>
             </div>
-            <p className="text-[11px] text-slate-400 mt-2">
-              AOV: ${(fin?.aov || 0).toFixed(2)} • RPV: ${(fin?.rpv || 0).toFixed(2)}
-            </p>
+
+            {/* 3. Subscriptions & MRR */}
+            <div id="metric-mrr" className={`bg-slate-900/80 border border-slate-800 rounded-3xl p-5 shadow-lg relative transition-all duration-500 ${spotlightTarget === 'metric-mrr' ? 'ring-4 ring-cyber-cyan shadow-[0_0_50px_rgba(0,240,255,0.8)] scale-[1.02] z-30' : ''}`}>
+              {spotlightTarget === 'metric-mrr' && (
+                <div className="absolute top-2 right-2 px-2.5 py-0.5 rounded-full bg-cyber-cyan text-black font-mono font-black text-[10px] shadow-glow-cyan flex items-center gap-1 animate-pulse">
+                  <span>[ ── ⊕ ── ]</span> <span>{spotlightCaption || 'ISOLATED'}</span>
+                </div>
+              )}
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-mono uppercase tracking-wider text-purple-400 font-bold flex items-center space-x-1.5">
+                  <RefreshCw className="w-4 h-4" />
+                  <span>MRR (Monthly)</span>
+                </span>
+                <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 font-bold">
+                  {subs?.activeSubscribersCount || 0} active
+                </span>
+              </div>
+              <div className="text-2xl sm:text-3xl font-black tracking-tight text-white mt-1">
+                ${(subs?.mrr || 0).toFixed(2)}
+                <span className="text-xs text-slate-400 font-normal">/mo</span>
+              </div>
+              <p className="text-[11px] text-slate-400 mt-2">
+                Projected ARR: ${(subs?.arr || 0).toFixed(2)} • 0% Churn
+              </p>
+            </div>
+
+            {/* 4. Traffic & Conversion Funnel */}
+            <div id="metric-active-subs" className={`bg-slate-900/80 border border-slate-800 rounded-3xl p-5 shadow-lg relative transition-all duration-500 ${spotlightTarget === 'metric-active-subs' ? 'ring-4 ring-cyber-cyan shadow-[0_0_50px_rgba(0,240,255,0.8)] scale-[1.02] z-30' : ''}`}>
+              {spotlightTarget === 'metric-active-subs' && (
+                <div className="absolute top-2 right-2 px-2.5 py-0.5 rounded-full bg-cyber-cyan text-black font-mono font-black text-[10px] shadow-glow-cyan flex items-center gap-1 animate-pulse">
+                  <span>[ ── ⊕ ── ]</span> <span>{spotlightCaption || 'ISOLATED'}</span>
+                </div>
+              )}
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-mono uppercase tracking-wider text-cyber-cyan font-bold flex items-center space-x-1.5">
+                  <Users className="w-4 h-4" />
+                  <span>Conversion Rate</span>
+                </span>
+                <span className="text-[10px] font-mono text-slate-400">
+                  {traf?.totalViews || 0} visits
+                </span>
+              </div>
+              <div className="text-2xl sm:text-3xl font-black tracking-tight text-white mt-1">
+                {traf?.conversionRatePct || '0.00'}%
+              </div>
+              <p className="text-[11px] text-slate-400 mt-2">
+                AOV: ${(fin?.aov || 0).toFixed(2)} • RPV: ${(fin?.rpv || 0).toFixed(2)}
+              </p>
+            </div>
           </div>
-        </div>
+        )}
 
         {/* ONE-TOUCH AUDIO WAKE & BRIEFING TRIGGER BANNER */}
         {!hasUnlockedAudio && (
@@ -2807,6 +2906,52 @@ export default function FounderDashboardPage() {
                 )}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* HOLOGRAPHIC VERIFICATION MODAL ("Dylan, is this what you're talking about?") */}
+      {pendingConfirmation && (
+        <div className="fixed inset-x-4 bottom-24 sm:bottom-10 z-50 max-w-md mx-auto bg-slate-950/95 border-2 border-cyber-cyan rounded-3xl p-5 shadow-[0_0_50px_rgba(0,240,255,0.5)] backdrop-blur-2xl text-white animate-in zoom-in-95 duration-200 select-none">
+          <div className="flex items-start space-x-3.5">
+            <div className="w-10 h-10 rounded-2xl bg-cyber-cyan text-black font-black flex items-center justify-center shrink-0 shadow-glow-cyan animate-bounce">
+              <Eye className="w-5 h-5" />
+            </div>
+            <div className="flex-1 space-y-1">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-mono uppercase tracking-widest text-cyber-cyan font-bold">
+                  {pendingConfirmation.caption}
+                </span>
+                <span className="text-[10px] font-mono text-cyan-300 bg-cyan-950/80 px-2 py-0.5 rounded-full border border-cyan-500/30 font-bold">
+                  🎙️ Speak &quot;Yes&quot; or &quot;No&quot;
+                </span>
+              </div>
+              <p className="text-sm font-bold text-white leading-snug">
+                {pendingConfirmation.question}
+              </p>
+              <p className="text-[11px] text-slate-400 font-mono">
+                Target Element: <strong className="text-cyan-300">#{pendingConfirmation.targetId}</strong> (highlighted on screen)
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center space-x-2.5 mt-4 pt-3 border-t border-slate-800">
+            <button
+              type="button"
+              onClick={() => executePendingConfirmation(true)}
+              className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-cyber-cyan to-blue-600 text-black font-black text-xs uppercase tracking-wider shadow-glow-cyan hover:brightness-110 active:scale-95 transition-all flex items-center justify-center space-x-1.5"
+            >
+              <Check className="w-4 h-4" />
+              <span>Yes, Do It</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => executePendingConfirmation(false)}
+              className="px-5 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-700 font-bold text-xs active:scale-95 transition-all flex items-center justify-center space-x-1.5"
+            >
+              <X className="w-4 h-4" />
+              <span>Cancel</span>
+            </button>
           </div>
         </div>
       )}

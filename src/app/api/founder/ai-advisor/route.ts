@@ -570,12 +570,36 @@ let hudActionData: any = null;
                 if (lower.includes('chat button') || lower.includes('new chat') || lower.includes('old chat') || lower.includes('past chat') || lower.includes('past chats')) {
                   const shouldHide = lower.includes('remove') || lower.includes('hide') || lower.includes('delete') || lower.includes('get rid') || !lower.includes('show');
                   hudActionData = {
-                    action: 'modify_ui',
-                    config: {
-                      showChatButtons: !shouldHide,
+                    action: 'verify_intent',
+                    targetId: 'founder-header-controls',
+                    pendingAction: {
+                      type: 'modify_ui',
+                      config: {
+                        showChatButtons: !shouldHide,
+                      },
                     },
-                    caption: shouldHide ? 'Removed Chat Buttons From Header' : 'Restored Chat Buttons To Header'
+                    question: shouldHide
+                      ? "I've highlighted the chat buttons in your header. Is this what you'd like me to remove, Dylan?"
+                      : "I've highlighted the header area. Would you like me to restore those buttons, Dylan?",
+                    caption: shouldHide ? 'CONFIRM: REMOVE CHAT BUTTONS?' : 'CONFIRM: RESTORE CHAT BUTTONS?'
                   };
+                  speech = shouldHide
+                    ? "Dylan, I've highlighted the chat buttons on your screen. Is this what you're talking about?"
+                    : "Dylan, I've highlighted the header. Would you like me to restore those buttons?";
+                } else if (lower.includes('top stat') || lower.includes('top number') || lower.includes('hide stat') || lower.includes('hide metric') || lower.includes('remove stat')) {
+                  hudActionData = {
+                    action: 'verify_intent',
+                    targetId: 'founder-top-stats',
+                    pendingAction: {
+                      type: 'modify_ui',
+                      config: {
+                        showTopStats: false,
+                      },
+                    },
+                    question: "I've highlighted the top metrics row on your screen. Is this what you'd like me to hide, Dylan?",
+                    caption: 'CONFIRM: HIDE TOP METRICS ROW?'
+                  };
+                  speech = "Dylan, I've highlighted the top metrics row. Is this what you're talking about?";
                 } else if (lower.includes('sales') || lower.includes('financials') || lower.includes('revenue') || lower.includes('profit') || lower.includes('money') || lower.includes('make today')) {
                   hudActionData = {
                     action: 'spotlight',
