@@ -111,21 +111,31 @@ export async function POST(req: NextRequest) {
         : '';
 
     // Auto-detect if Dylan is establishing a permanent rule or correcting Jarvis
+    const strippedPrompt = prompt.replace(/^(hey\s+)?jarvis[,:\s]*/i, '').trim();
     const isDirectiveIntent =
-      /^(remember this|rule number|rule #|never recommend|never suggest|always recommend|always use|new rule:|don't ever|dont ever|from now on)\b/i.test(prompt) ||
-      /\b(never forget this|write this down in your memory|store this rule|remember that)\b/i.test(prompt);
+      /^(remember this|remember that|rule\s*(number|#)?\s*\d*|never recommend|never suggest|always recommend|always use|new rule|don't ever|dont ever|from now on|make sure to always|never do)\b/i.test(strippedPrompt) ||
+      /\b(never forget this|write this down|store this rule|lock this rule|remember this rule|remember this)\b/i.test(strippedPrompt);
 
     if (isDirectiveIntent) {
-      const cleanRule = prompt.replace(/^(remember this|rule number \d+|new rule:|from now on|remember that)[:\s]*/i, '').trim();
+      const cleanRule = strippedPrompt
+        .replace(/^(remember this rule|remember this|remember that|rule\s*(number|#)?\s*\d*|new rule|from now on)[:\s]*/i, '')
+        .trim();
       if (cleanRule.length > 5) {
         await recordJarvisDirective({
           id: `dir_${Date.now()}`,
           rule: cleanRule,
-          category: cleanRule.toLowerCase().includes('808') || cleanRule.toLowerCase().includes('plugin') || cleanRule.toLowerCase().includes('dsp')
-            ? 'dsp_audio'
-            : cleanRule.toLowerCase().includes('tiktok') || cleanRule.toLowerCase().includes('ad')
-            ? 'marketing'
-            : 'business_rule',
+          category:
+            cleanRule.toLowerCase().includes('808') ||
+            cleanRule.toLowerCase().includes('plugin') ||
+            cleanRule.toLowerCase().includes('dsp') ||
+            cleanRule.toLowerCase().includes('vst') ||
+            cleanRule.toLowerCase().includes('aax')
+              ? 'dsp_audio'
+              : cleanRule.toLowerCase().includes('tiktok') ||
+                cleanRule.toLowerCase().includes('ad') ||
+                cleanRule.toLowerCase().includes('video')
+              ? 'marketing'
+              : 'business_rule',
           learnedFrom: prompt,
           createdAt: new Date().toISOString(),
         });
