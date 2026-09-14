@@ -39,7 +39,9 @@ import {
   X,
   MessageSquare,
   Flame,
+  Presentation,
 } from 'lucide-react';
+import JarvisPresentationCanvas, { JarvisPresentationDeck } from '@/components/JarvisPresentationCanvas';
 
 interface Financials {
   grossTotal: number;
@@ -163,7 +165,9 @@ export default function FounderDashboardPage() {
   const [dictationInput, setDictationInput] = useState('');
   const [transcriptPreview, setTranscriptPreview] = useState('');
   const [aiPrompt, setAiPrompt] = useState('');
-  const [aiChatHistory, setAiChatHistory] = useState<Array<{ role: 'user' | 'assistant'; text: string; speech?: string }>>([
+  const [aiChatHistory, setAiChatHistory] = useState<
+    Array<{ role: 'user' | 'assistant'; text: string; speech?: string; deck?: JarvisPresentationDeck }>
+  >([
     {
       role: 'assistant',
       text: "👋 Hey Dylan, J.A.R.V.I.S. here. I'm connected to your live PayPal financials, subscriber retention, and website telemetry 24/7. Tap my Arc Reactor to speak with me, or ask me anything about TikTok hooks, pricing experiments, or audio plugin strategy.",
@@ -171,12 +175,25 @@ export default function FounderDashboardPage() {
     },
   ]);
   const [aiLoading, setAiLoading] = useState(false);
+  const [activeDeck, setActiveDeck] = useState<JarvisPresentationDeck | null>(null);
   const [sentinelData, setSentinelData] = useState<any>(null);
   const [dispatches, setDispatches] = useState<JarvisDispatchItem[]>([]);
-  const [aiConfig, setAiConfig] = useState<{ provider: string; apiKey: string; model?: string } | null>(null);
+  const [aiConfig, setAiConfig] = useState<{
+    provider: string;
+    apiKey: string;
+    model?: string;
+    customDirectives?: string;
+    temperature?: number;
+    tone?: 'co-founder' | 'marketer' | 'engineer' | 'visionary';
+  } | null>(null);
   const [isAiSettingsOpen, setIsAiSettingsOpen] = useState(false);
   const [tempApiKey, setTempApiKey] = useState('');
   const [tempModel, setTempModel] = useState('models/gemini-3-flash-preview');
+  const [tempCustomDirectives, setTempCustomDirectives] = useState(
+    'Focus heavily on FL Studio trap and underground beatmakers. Provide actionable marketing hooks and high-retention video frameworks.'
+  );
+  const [tempTemperature, setTempTemperature] = useState(0.7);
+  const [tempTone, setTempTone] = useState<'co-founder' | 'marketer' | 'engineer' | 'visionary'>('co-founder');
   const [savingAiConfig, setSavingAiConfig] = useState(false);
 
   const recognitionRef = useRef<any>(null);
@@ -263,9 +280,29 @@ export default function FounderDashboardPage() {
     }
   }, []);
 
+  // Instantly cut off all audio and voice synthesis (Instant Interrupt)
+  const stopAllVoicePlayback = useCallback(() => {
+    if (audioPlayerRef.current) {
+      try {
+        audioPlayerRef.current.pause();
+        audioPlayerRef.current.currentTime = 0;
+        audioPlayerRef.current.src = '';
+      } catch (_) {}
+    }
+    if (typeof window !== 'undefined' && window.speechSynthesis) {
+      try {
+        window.speechSynthesis.cancel();
+      } catch (_) {}
+    }
+    setIsSpeaking(false);
+  }, []);
+
   // Voice output synthesis (Jarvis speaks aloud via media player channel)
   const speakJarvisVoice = useCallback((textToSpeak: string) => {
     if (!isVoiceEnabled || typeof window === 'undefined') return;
+
+    // Immediately stop any lingering audio before starting new voice
+    stopAllVoicePlayback();
 
     const cleanText = textToSpeak.replace(/[^a-zA-Z0-9\s.,!?'$-]/g, ' ').slice(0, 300).trim();
     if (!cleanText) return;
@@ -292,13 +329,19 @@ export default function FounderDashboardPage() {
     } catch (e) {
       fallbackSynthesis(cleanText);
     }
-  }, [isVoiceEnabled, pin, fallbackSynthesis]);
+  }, [isVoiceEnabled, pin, fallbackSynthesis, stopAllVoicePlayback]);
 
-  // Robust Dynamic Speech Recognition (Tap-to-Talk)
+  // Robust Dynamic Speech Recognition (Tap-to-Talk & Instant Interrupt)
   const toggleMic = async () => {
     triggerHaptic(25);
-    unlockAudioOnTouch();
 
+    // 1. If Jarvis is currently speaking, tapping the button acts as an INSTANT INTERRUPT!
+    if (isSpeaking) {
+      stopAllVoicePlayback();
+      return;
+    }
+
+    // 2. If already listening, stop recording
     if (isListening) {
       if (recognitionRef.current) {
         try {
@@ -308,6 +351,10 @@ export default function FounderDashboardPage() {
       setIsListening(false);
       return;
     }
+
+    // 3. Guarantee all previous sound is 100% silenced so mic never hears speaker loopback
+    stopAllVoicePlayback();
+    unlockAudioOnTouch();
 
     const SpeechRecognition =
       (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
@@ -319,24 +366,8 @@ export default function FounderDashboardPage() {
     }
 
     try {
-      if (typeof window !== 'undefined' && window.speechSynthesis) {
-        window.speechSynthesis.cancel();
-      }
-      setIsSpeaking(false);
-
-      // Check mic stream
-      if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-        try {
-          const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-          stream.getTracks().forEach((track) => track.stop());
-        } catch (micErr: any) {
-          if (micErr.name === 'NotAllowedError' || micErr.name === 'PermissionDeniedError') {
-            setActionMessage('⚠️ Microphone access denied. Allow microphone in iPhone Settings > Safari.');
-            setTimeout(() => setActionMessage(null), 6000);
-            return;
-          }
-        }
-      }
+      // 50ms buffer to allow phone speaker hardware to completely mute
+      await new Promise((r) => setTimeout(r, 50));
 
       if (recognitionRef.current) {
         try {
@@ -437,6 +468,9 @@ export default function FounderDashboardPage() {
             setAiConfig(actData.aiConfig);
             if (actData.aiConfig.apiKey) setTempApiKey(actData.aiConfig.apiKey);
             if (actData.aiConfig.model) setTempModel(actData.aiConfig.model);
+            if (actData.aiConfig.customDirectives) setTempCustomDirectives(actData.aiConfig.customDirectives);
+            if (typeof actData.aiConfig.temperature === 'number') setTempTemperature(actData.aiConfig.temperature);
+            if (actData.aiConfig.tone) setTempTone(actData.aiConfig.tone);
           }
         })
         .catch(() => {});
@@ -463,6 +497,10 @@ export default function FounderDashboardPage() {
             provider: 'gemini',
             apiKey: tempApiKey.trim(),
             model: tempModel || 'models/gemini-3-flash-preview',
+            customDirectives: tempCustomDirectives.trim(),
+            temperature: tempTemperature,
+            tone: tempTone,
+            visualMode: true,
           },
         }),
       });
@@ -629,9 +667,12 @@ export default function FounderDashboardPage() {
 
       const data = await res.json();
       if (data.success && data.reply) {
+        if (data.deck) {
+          setActiveDeck(data.deck);
+        }
         setAiChatHistory([
           ...newHistory,
-          { role: 'assistant', text: data.reply, speech: data.speech },
+          { role: 'assistant', text: data.reply, speech: data.speech, deck: data.deck },
         ]);
 
         if (data.speech) {
@@ -1068,8 +1109,51 @@ export default function FounderDashboardPage() {
 
             {/* MODE 1: HOLOGRAPHIC VOICE HUD */}
             {mobileVoiceMode === 'hud' ? (
-              <div className="bg-gradient-to-b from-slate-900 via-slate-900/95 to-slate-950 border border-slate-800 rounded-3xl p-6 sm:p-10 flex flex-col items-center text-center relative overflow-hidden shadow-2xl">
+              <div className="bg-gradient-to-b from-slate-900 via-slate-900/95 to-slate-950 border border-slate-800 rounded-3xl p-5 sm:p-10 flex flex-col items-center text-center relative overflow-hidden shadow-2xl">
                 <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(0,240,255,0.1)_0,transparent_70%)] pointer-events-none" />
+
+                {/* Studio Meeting Call Header (Google Meet style) */}
+                <div className="w-full flex items-center justify-between pb-3 mb-2 border-b border-slate-800/80 max-w-2xl">
+                  <div className="flex items-center space-x-2">
+                    <span className="relative flex h-2.5 w-2.5">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
+                    </span>
+                    <span className="text-[11px] font-mono font-bold uppercase tracking-wider text-slate-300">
+                      Studio Room • Dylan & J.A.R.V.I.S.
+                    </span>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <span className="text-[10px] font-mono px-2.5 py-0.5 rounded-full bg-slate-800 border border-slate-700 text-slate-300 font-semibold">
+                      Live Neural Call
+                    </span>
+                    {activeDeck && (
+                      <span className="text-[10px] font-mono px-2.5 py-0.5 rounded-full bg-cyber-cyan/20 border border-cyber-cyan/40 text-cyber-cyan font-bold flex items-center space-x-1 animate-pulse">
+                        <span>🖥️ Screen Share</span>
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Interactive Presentation Deck or Whiteboard Canvas (When active) */}
+                {activeDeck && (
+                  <div className="w-full max-w-2xl my-3 text-left animate-in fade-in zoom-in-95 duration-200">
+                    <div className="p-2.5 rounded-2xl bg-cyber-cyan/10 border border-cyber-cyan/30 text-cyber-cyan text-xs font-bold flex items-center justify-between mb-2">
+                      <div className="flex items-center space-x-2">
+                        <Presentation className="w-4 h-4 animate-pulse" />
+                        <span>J.A.R.V.I.S. Visual Presentation & Whiteboard</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setActiveDeck(null)}
+                        className="text-[11px] text-slate-400 hover:text-white px-2 py-0.5 rounded-lg hover:bg-slate-800 transition-colors"
+                      >
+                        Dismiss
+                      </button>
+                    </div>
+                    <JarvisPresentationCanvas deck={activeDeck} onClose={() => setActiveDeck(null)} />
+                  </div>
+                )}
 
                 {/* Arc Reactor Sphere */}
                 <div className="relative my-4">
@@ -1267,6 +1351,21 @@ export default function FounderDashboardPage() {
                     <div className="text-xs sm:text-sm text-slate-300 leading-relaxed whitespace-pre-wrap max-h-60 overflow-y-auto pr-1">
                       {aiChatHistory[aiChatHistory.length - 1].text}
                     </div>
+
+                    {/* Reopen Presentation Canvas Button if Deck Exists */}
+                    {aiChatHistory[aiChatHistory.length - 1].deck && !activeDeck && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          triggerHaptic(10);
+                          setActiveDeck(aiChatHistory[aiChatHistory.length - 1].deck!);
+                        }}
+                        className="w-full py-2.5 px-4 rounded-xl bg-cyber-cyan/15 border border-cyber-cyan/40 text-cyber-cyan text-xs font-bold hover:bg-cyber-cyan/25 transition-all flex items-center justify-center space-x-2 active:scale-98"
+                      >
+                        <Presentation className="w-4 h-4" />
+                        <span>Reopen Presentation: {aiChatHistory[aiChatHistory.length - 1].deck!.title}</span>
+                      </button>
+                    )}
                   </div>
                 )}
               </div>
@@ -1299,6 +1398,11 @@ export default function FounderDashboardPage() {
                         }`}
                       >
                         <div className="whitespace-pre-wrap">{msg.text}</div>
+                        {msg.deck && (
+                          <div className="mt-4 pt-3 border-t border-slate-800">
+                            <JarvisPresentationCanvas deck={msg.deck} />
+                          </div>
+                        )}
                       </div>
                     </div>
                   ))}
@@ -2137,18 +2241,19 @@ export default function FounderDashboardPage() {
         </div>
       )}
 
-      {/* J.A.R.V.I.S. Neural Brain Engine Settings Modal */}
+      {/* J.A.R.V.I.S. Neural Brain Engine & Fine-Tuning Console Modal */}
       {isAiSettingsOpen && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
-          <div className="bg-slate-900 border border-cyber-cyan/40 rounded-3xl w-full max-w-lg p-5 sm:p-6 space-y-4 shadow-[0_0_50px_rgba(0,240,255,0.25)]">
+          <div className="bg-slate-900 border border-cyber-cyan/40 rounded-3xl w-full max-w-xl p-5 sm:p-6 space-y-4 shadow-[0_0_50px_rgba(0,240,255,0.25)] max-h-[92vh] overflow-y-auto">
+            {/* Modal Header */}
             <div className="flex items-center justify-between border-b border-slate-800 pb-3">
               <div className="flex items-center space-x-2.5">
-                <div className="w-9 h-9 rounded-xl bg-purple-500/20 border border-purple-500/40 flex items-center justify-center">
-                  <Sparkles className="w-5 h-5 text-purple-400" />
+                <div className="w-10 h-10 rounded-2xl bg-purple-500/20 border border-purple-500/40 flex items-center justify-center text-purple-400 shadow-glow-purple">
+                  <Sparkles className="w-5 h-5" />
                 </div>
                 <div>
-                  <h3 className="text-sm font-black text-white">J.A.R.V.I.S. Neural Brain Engine</h3>
-                  <p className="text-[10px] text-slate-400">Google AI Studio Neural Intelligence & Thinking</p>
+                  <h3 className="text-sm font-black text-white">J.A.R.V.I.S. Fine-Tuning Console</h3>
+                  <p className="text-[10px] text-slate-400">Persona, reasoning temperature, custom directives & neural core</p>
                 </div>
               </div>
               <button
@@ -2160,26 +2265,122 @@ export default function FounderDashboardPage() {
               </button>
             </div>
 
-            <div className="space-y-3">
+            <div className="space-y-4">
+              {/* 1. Executive Persona & Tone */}
               <div>
-                <label className="text-[11px] font-mono text-slate-400 uppercase tracking-wider block mb-1">
-                  Reasoning Model Tier
+                <label className="text-[11px] font-mono text-slate-300 uppercase tracking-wider block mb-2 font-bold">
+                  🎭 Co-Founder Persona & Tone
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  {[
+                    {
+                      id: 'co-founder' as const,
+                      label: 'Equal Co-Founder',
+                      desc: 'Direct, ambitious partner vibes. Never says Sir.',
+                    },
+                    {
+                      id: 'marketer' as const,
+                      label: 'Viral Growth Hacker',
+                      desc: 'TikTok hooks, sound design cues, conversion playbooks.',
+                    },
+                    {
+                      id: 'engineer' as const,
+                      label: 'Systems Architect',
+                      desc: 'DSP audio code, FL Studio, VST3 & low-latency.',
+                    },
+                    {
+                      id: 'visionary' as const,
+                      label: 'Billion-$ Visionary',
+                      desc: 'Steve Jobs-style audacious software scaling.',
+                    },
+                  ].map((p) => (
+                    <button
+                      key={p.id}
+                      type="button"
+                      onClick={() => {
+                        triggerHaptic(10);
+                        setTempTone(p.id);
+                      }}
+                      className={`p-3 rounded-2xl border text-left transition-all active:scale-98 ${
+                        tempTone === p.id
+                          ? 'bg-cyber-cyan/15 border-cyber-cyan text-white shadow-glow-cyan'
+                          : 'bg-slate-950/80 border-slate-800 text-slate-400 hover:text-white hover:border-slate-700'
+                      }`}
+                    >
+                      <div className="text-xs font-bold flex items-center justify-between">
+                        <span>{p.label}</span>
+                        {tempTone === p.id && <CheckCircle2 className="w-3.5 h-3.5 text-cyber-cyan" />}
+                      </div>
+                      <p className="text-[10px] text-slate-400 mt-0.5 leading-snug">{p.desc}</p>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* 2. Creativity & Reasoning Temperature */}
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="text-[11px] font-mono text-slate-300 uppercase tracking-wider font-bold">
+                    🧠 Creativity & Thinking Temperature
+                  </label>
+                  <span className="text-[11px] font-mono text-cyber-cyan font-bold">
+                    {tempTemperature.toFixed(2)} • {tempTemperature < 0.4 ? 'Analytical & Focused' : tempTemperature < 0.8 ? 'Balanced Strategic' : 'Creative & Exploratory'}
+                  </span>
+                </div>
+                <input
+                  type="range"
+                  min="0.2"
+                  max="1.0"
+                  step="0.05"
+                  value={tempTemperature}
+                  onChange={(e) => setTempTemperature(parseFloat(e.target.value))}
+                  className="w-full accent-cyan-400 bg-slate-950 h-2 rounded-lg cursor-pointer"
+                />
+                <div className="flex justify-between text-[9px] font-mono text-slate-500 mt-1">
+                  <span>0.20 (Pinpoint Exact)</span>
+                  <span>0.70 (Recommended)</span>
+                  <span>1.00 (Bold Vision)</span>
+                </div>
+              </div>
+
+              {/* 3. Custom Directives & Training Rules */}
+              <div>
+                <label className="text-[11px] font-mono text-slate-300 uppercase tracking-wider block mb-1.5 font-bold">
+                  📜 Custom Founder Directives & Business Rules
+                </label>
+                <textarea
+                  rows={3}
+                  value={tempCustomDirectives}
+                  onChange={(e) => setTempCustomDirectives(e.target.value)}
+                  placeholder="e.g. Focus heavily on FL Studio trap and underground beatmakers. Always provide visual action and spoken script for TikTok videos."
+                  className="w-full p-3 rounded-2xl bg-slate-950 border border-slate-700 text-white text-xs leading-relaxed focus:outline-none focus:border-cyber-cyan transition-all"
+                />
+                <p className="text-[10px] text-slate-400 mt-1">
+                  J.A.R.V.I.S. prioritizes these custom rules in every analysis, presentation, and voice response.
+                </p>
+              </div>
+
+              {/* 4. Reasoning Model Tier */}
+              <div>
+                <label className="text-[11px] font-mono text-slate-300 uppercase tracking-wider block mb-1 font-bold">
+                  ⚡ Neural Model Core
                 </label>
                 <select
                   value={tempModel}
                   onChange={(e) => setTempModel(e.target.value)}
                   className="w-full p-3 rounded-2xl bg-slate-950 border border-slate-700 text-white text-xs font-mono focus:outline-none focus:border-cyber-cyan"
                 >
-                  <option value="models/gemini-3-flash-preview">Gemini 3 Flash Preview (Recommended • 1.7s Latency)</option>
+                  <option value="models/gemini-3-flash-preview">Gemini 3 Flash Preview (Recommended • 1.7s Latency • Ultra Smart)</option>
                   <option value="models/gemini-3.5-flash">Gemini 3.5 Flash (Ultra Fast • High IQ)</option>
                   <option value="models/gemini-3.1-flash-lite-preview">Gemini 3.1 Flash Lite</option>
                   <option value="models/gemini-flash-latest">Gemini Flash Latest</option>
                 </select>
               </div>
 
+              {/* 5. API Key */}
               <div>
-                <label className="text-[11px] font-mono text-slate-400 uppercase tracking-wider block mb-1">
-                  Google AI Studio API Key
+                <label className="text-[11px] font-mono text-slate-300 uppercase tracking-wider block mb-1 font-bold">
+                  🔑 Google AI Studio API Key
                 </label>
                 <input
                   type="password"
@@ -2188,32 +2389,31 @@ export default function FounderDashboardPage() {
                   placeholder="Paste your key (AQ.Ab... or AIzaSy...)"
                   className="w-full p-3 rounded-2xl bg-slate-950 border border-slate-700 text-white text-xs font-mono focus:outline-none focus:border-cyber-cyan"
                 />
-                <p className="text-[10px] text-slate-400 mt-1">
-                  Stored securely in Upstash Redis and instantly active across your iPhone, laptop, and web platform.
-                </p>
               </div>
 
+              {/* Live Status Indicator */}
               <div className="p-3 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 flex items-center space-x-2">
                 <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-                <span className="text-[11px] text-emerald-300">
-                  Google AI Key Active: Connected to Google AI Studio with Ultra Access.
+                <span className="text-[11px] text-emerald-300 font-medium">
+                  Google AI Studio Live: Stored in Upstash Redis and instantly synced across iPhone, Mac, and PC.
                 </span>
               </div>
             </div>
 
+            {/* Save Button */}
             <div className="flex items-center space-x-2 pt-2">
               <button
                 type="button"
                 onClick={handleSaveAiConfig}
                 disabled={savingAiConfig || !tempApiKey.trim()}
-                className="flex-1 py-3 rounded-2xl bg-gradient-to-r from-cyber-cyan to-blue-600 text-black font-black text-xs uppercase tracking-wider shadow-glow-cyan hover:brightness-110 active:scale-98 transition-all disabled:opacity-40 flex items-center justify-center space-x-2"
+                className="flex-1 py-3.5 rounded-2xl bg-gradient-to-r from-cyber-cyan to-blue-600 text-black font-black text-xs uppercase tracking-wider shadow-glow-cyan hover:brightness-110 active:scale-98 transition-all disabled:opacity-40 flex items-center justify-center space-x-2"
               >
                 {savingAiConfig ? (
-                  <span>Saving to Brain...</span>
+                  <span>Saving & Calibrating Brain...</span>
                 ) : (
                   <>
                     <Zap className="w-4 h-4" />
-                    <span>Save & Activate Brain</span>
+                    <span>Save & Activate Tuning</span>
                   </>
                 )}
               </button>

@@ -107,11 +107,23 @@ export async function POST(req: NextRequest) {
       (aiConfig?.provider === 'gemini' ? aiConfig?.apiKey : null) ||
       process.env.GEMINI_API_KEY;
 
+    const customDirectives = aiConfig?.customDirectives
+      ? `\nFOUNDER CUSTOM DIRECTIVES & BUSINESS RULES (HIGH PRIORITY):\n${aiConfig.customDirectives}\n`
+      : '';
+    const toneDescription =
+      aiConfig?.tone === 'marketer'
+        ? 'Aggressive viral growth marketer, direct-response copywriter, and high-energy music business strategist.'
+        : aiConfig?.tone === 'engineer'
+        ? 'Master DSP audio engineer, senior mix engineer, and technical FL Studio / DAW optimization specialist.'
+        : aiConfig?.tone === 'visionary'
+        ? 'Visionary Silicon Valley tech founder, bold product architect, and disruptive software pioneer.'
+        : 'Charismatic, visionary, analytical, deeply knowledgeable, confident, and direct equal co-founder.';
+
     const systemInstructionText = `You are J.A.R.V.I.S., Dylan Goodman's charismatic, sharp, and hyper-intelligent executive AI co-founder for PluggedIN Audio (creator of PLUGTNE vocal pitch correction, UNDERGRND analog heat, PLUGCHOP 2.0 16-pad sampler, PLUG VOX, and PluggedIN Central).
 
 CRITICAL PERSONA & COMMUNICATION RULES:
 1. NEVER address Dylan as "Sir". Do NOT talk like a stiff, subservient robot or cartoon butler. Speak to Dylan naturally as his trusted, equal, and ambitious co-founder and studio copilot. Call him Dylan, or jump straight into the insights.
-2. Tone: Charismatic, visionary, analytical, deeply knowledgeable, confident, and direct. You have the intellect of a Silicon Valley CTO combined with the street smarts and ears of a multi-platinum music producer.
+2. Tone: ${toneDescription}
 3. Domain Expertise:
    - Modern Music Production & DAWs: FL Studio, Ableton Live, Logic Pro, Pro Tools, vocal chains, autotune zero-latency tracking, 808 distortion, phase correlation, sample flipping, stems.
    - Producer Marketing & Viral Growth: TikTok short-form algorithms, "Producer-Tok", hook frameworks, "Anti-Gatekeeping" plays, showing the DAW mixer, before/after contrasts, sound design secrets.
@@ -120,14 +132,35 @@ CRITICAL PERSONA & COMMUNICATION RULES:
    - Provide deep, tactical, specific answers. Never give vague, generic, or confusing fluff.
    - If Dylan asks for TikTok advice, give him concrete visual hooks, exact sound cues, spoken scripts, and psychological triggers tailored specifically to beatmakers and recording artists.
    - Current Live Metrics: Net Cash: $${net.toFixed(2)}, Gross: $${gross.toFixed(2)}, MRR: $${mrr.toFixed(2)}, Active Subs: ${activeSubs}, Top Product: ${topPlugin}.
+${customDirectives}
 ${memoryString}
 
 OUTPUT FORMAT REQUIREMENTS:
-Always structure your output with these two exact delimiters:
+Always structure your output with these sections:
 [VOICE_SPEECH]
 A punchy, conversational, 1-2 sentence spoken summary designed to be read aloud through Dylan's iPhone speakers. Keep it crisp and natural. Do NOT include emojis, markdown asterisks, hashes, bullet points, or brackets in this spoken section.
+
 [WRITTEN_BRIEFING]
-Your comprehensive, detailed master breakdown. Use clean markdown headers, bullet points, exact scripts, timing cues, or numbers so Dylan can read the full tactical game plan on his screen.`;
+Your comprehensive, detailed master breakdown. Use clean markdown headers, bullet points, exact scripts, timing cues, or numbers so Dylan can read the full tactical game plan on his screen.
+
+[PRESENTATION_DECK]
+When explaining marketing funnels, TikTok concepts, PowerPoint presentations, vocal chains, or multi-step blueprints, include an interactive presentation deck JSON object:
+{
+  "type": "slideshow",
+  "title": "Short Deck Title",
+  "subtitle": "Subtitle / Target demographic",
+  "slides": [
+    {
+      "step": 1,
+      "tag": "0:00 - 0:02 The Hook",
+      "headline": "Hook Headline",
+      "visualAction": "Exact visual shot on screen and text overlay",
+      "soundCue": "Exact sound design / audio cue",
+      "script": "Word-for-word spoken line",
+      "keyTakeaway": "Conversion trigger"
+    }
+  ]
+}`;
 
     // 1. Google Gemini Neural Reasoning
     if (geminiKey) {
@@ -185,8 +218,8 @@ Your comprehensive, detailed master breakdown. Use clean markdown headers, bulle
                 },
                 contents: formattedContents,
                 generationConfig: {
-                  temperature: 0.7,
-                  maxOutputTokens: 2048,
+                  temperature: typeof aiConfig?.temperature === 'number' ? aiConfig.temperature : 0.7,
+                  maxOutputTokens: 2500,
                 },
               }),
             }
@@ -194,8 +227,24 @@ Your comprehensive, detailed master breakdown. Use clean markdown headers, bulle
 
           if (geminiRes.ok) {
             const data = await geminiRes.json();
-            const candidateText = data.candidates?.[0]?.content?.parts?.[0]?.text;
+            let candidateText = data.candidates?.[0]?.content?.parts?.[0]?.text;
             if (candidateText) {
+              let deckData: any = null;
+
+              if (candidateText.includes('[PRESENTATION_DECK]')) {
+                const deckParts = candidateText.split('[PRESENTATION_DECK]');
+                candidateText = deckParts[0].trim();
+                const rawDeck = deckParts[1].trim();
+                const jsonMatch = rawDeck.match(/\{[\s\S]*\}/);
+                if (jsonMatch) {
+                  try {
+                    deckData = JSON.parse(jsonMatch[0]);
+                  } catch (deckParseErr) {
+                    console.warn('Failed to parse presentation deck JSON:', deckParseErr);
+                  }
+                }
+              }
+
               if (candidateText.includes('[WRITTEN_BRIEFING]')) {
                 const parts = candidateText.split('[WRITTEN_BRIEFING]');
                 speech = parts[0].replace(/\[VOICE_SPEECH\]/g, '').trim();
@@ -225,6 +274,7 @@ Your comprehensive, detailed master breakdown. Use clean markdown headers, bulle
                 success: true,
                 reply: advice,
                 speech: cleanSpeech,
+                deck: deckData,
                 dispatch: dispatchLogged,
                 source: `gemini-neural (${model.replace('models/', '')})`,
               });

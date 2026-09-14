@@ -967,6 +967,10 @@ export interface FounderAiConfig {
   provider: 'gemini' | 'groq' | 'openai';
   apiKey: string;
   model?: string;
+  customDirectives?: string;
+  temperature?: number;
+  tone?: 'co-founder' | 'marketer' | 'engineer' | 'visionary';
+  visualMode?: boolean;
   updatedAt: string;
 }
 
@@ -987,6 +991,10 @@ export async function fetchAiConfig(): Promise<FounderAiConfig | null> {
       provider: 'gemini',
       apiKey: process.env.GEMINI_API_KEY,
       model: 'models/gemini-3-flash-preview',
+      customDirectives: 'Focus heavily on FL Studio trap and underground beatmakers. Provide actionable marketing hooks and high-retention video frameworks.',
+      temperature: 0.7,
+      tone: 'co-founder',
+      visualMode: true,
       updatedAt: new Date().toISOString(),
     };
   }
@@ -997,12 +1005,20 @@ export async function saveAiConfig(config: {
   provider: 'gemini' | 'groq' | 'openai';
   apiKey: string;
   model?: string;
+  customDirectives?: string;
+  temperature?: number;
+  tone?: 'co-founder' | 'marketer' | 'engineer' | 'visionary';
+  visualMode?: boolean;
 }): Promise<FounderAiConfig> {
   const redis = getRedis();
   const fullConfig: FounderAiConfig = {
     provider: config.provider || 'gemini',
     apiKey: config.apiKey,
     model: config.model || (config.provider === 'gemini' ? 'models/gemini-3-flash-preview' : undefined),
+    customDirectives: config.customDirectives,
+    temperature: typeof config.temperature === 'number' ? config.temperature : 0.7,
+    tone: config.tone || 'co-founder',
+    visualMode: config.visualMode ?? true,
     updatedAt: new Date().toISOString(),
   };
   if (redis) {
