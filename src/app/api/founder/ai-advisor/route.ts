@@ -160,6 +160,47 @@ When explaining marketing funnels, TikTok concepts, PowerPoint presentations, vo
       "keyTakeaway": "Conversion trigger"
     }
   ]
+}
+
+[AD_VIDEO]
+When Dylan asks to create, generate, script, or brainstorm an ad, video ad, TikTok promo, or commercial for any plugin (e.g. PLUGTNE, UNDERGRND, PLUGCHOP, PLUG VOX), generate an interactive video ad JSON block:
+{
+  "pluginId": "plugtne",
+  "pluginName": "PLUGTNE (Vocal Pitch Correction)",
+  "hookHeadline": "Why Your Vocals Sound Like an Amateur Demo in FL Studio",
+  "targetAudience": "FL Studio Melodic Trap & Vocal Producers",
+  "aspectRatio": "9:16",
+  "audioPair": "vocal",
+  "callToAction": "Grab PLUGTNE at pluggedin.studio • Link in bio",
+  "scenes": [
+    {
+      "sceneNumber": 1,
+      "durationSec": 3,
+      "headline": "Stop recording off-key vocals.",
+      "visualAction": "Raw vocal waveform with red pitch-error marker in FL Studio.",
+      "audioMode": "dry",
+      "badgeText": "A/B: BEFORE (RAW DEMO)",
+      "subtitles": ["Stop", "recording", "off-key", "vocals", "in", "FL", "Studio."]
+    },
+    {
+      "sceneNumber": 2,
+      "durationSec": 4,
+      "headline": "Lock in instantly with PLUGTNE.",
+      "visualAction": "PLUGTNE interface opens with Snap speed turned to 100%.",
+      "audioMode": "wet",
+      "badgeText": "A/B: AFTER (PLUGTNE ENGAGED)",
+      "subtitles": ["One", "click", "and", "your", "pitch", "snaps", "into", "place."]
+    },
+    {
+      "sceneNumber": 3,
+      "durationSec": 3,
+      "headline": "Radio ready vocals in seconds.",
+      "visualAction": "Full beat drop with processed vocal sitting in the mix.",
+      "audioMode": "wet",
+      "badgeText": "RADIO READY",
+      "subtitles": ["Stop", "gatekeeping", "your", "sound.", "Link", "in", "bio."]
+    }
+  ]
 }`;
 
     // 1. Google Gemini Neural Reasoning
@@ -230,6 +271,21 @@ When explaining marketing funnels, TikTok concepts, PowerPoint presentations, vo
             let candidateText = data.candidates?.[0]?.content?.parts?.[0]?.text;
             if (candidateText) {
               let deckData: any = null;
+              let videoAdData: any = null;
+
+              if (candidateText.includes('[AD_VIDEO]')) {
+                const videoParts = candidateText.split('[AD_VIDEO]');
+                candidateText = videoParts[0].trim();
+                const rawAd = videoParts[1].trim();
+                const jsonMatch = rawAd.match(/\{[\s\S]*\}/);
+                if (jsonMatch) {
+                  try {
+                    videoAdData = JSON.parse(jsonMatch[0]);
+                  } catch (adParseErr) {
+                    console.warn('Failed to parse ad video JSON:', adParseErr);
+                  }
+                }
+              }
 
               if (candidateText.includes('[PRESENTATION_DECK]')) {
                 const deckParts = candidateText.split('[PRESENTATION_DECK]');
@@ -243,6 +299,65 @@ When explaining marketing funnels, TikTok concepts, PowerPoint presentations, vo
                     console.warn('Failed to parse presentation deck JSON:', deckParseErr);
                   }
                 }
+              }
+
+              // Fallback: If Dylan explicitly asked for an ad/video and JSON wasn't parsed, construct authentic video ad
+              if (!videoAdData && (lower.includes('ad') || lower.includes('video') || lower.includes('commercial') || lower.includes('promo'))) {
+                const isUnderground = lower.includes('undergrnd') || lower.includes('underground') || lower.includes('808');
+                const isPlugChop = lower.includes('chop') || lower.includes('sampler');
+                const isPlugVox = lower.includes('vox');
+
+                const pluginKey = isUnderground ? 'undergrnd' : isPlugChop ? 'plugchop' : isPlugVox ? 'plugvox' : 'plugtne';
+                const pluginTitle = isUnderground
+                  ? 'UNDERGRND (Analog 808 Heat)'
+                  : isPlugChop
+                  ? 'PLUGCHOP 2.0 (16-Pad Sampler)'
+                  : isPlugVox
+                  ? 'PLUG VOX (Vocal Processing)'
+                  : 'PLUGTNE (Vocal Pitch Correction)';
+
+                videoAdData = {
+                  pluginId: pluginKey,
+                  pluginName: pluginTitle,
+                  hookHeadline: isUnderground
+                    ? 'Why Your 808s Sound Weak on Phone Speakers'
+                    : isPlugChop
+                    ? 'How Multi-Platinum Producers Chop Samples in 10 Seconds'
+                    : 'Why Your Vocals Sound Like an Amateur Demo in FL Studio',
+                  targetAudience: 'FL Studio Trap & Underground Beatmakers',
+                  aspectRatio: '9:16',
+                  audioPair: isUnderground ? '808' : isPlugChop ? 'sample' : 'vocal',
+                  callToAction: `Grab ${pluginKey.toUpperCase()} at pluggedin.studio • Link in bio`,
+                  scenes: [
+                    {
+                      sceneNumber: 1,
+                      durationSec: 3,
+                      headline: isUnderground ? 'Stop exporting weak 808s.' : 'Stop recording off-key vocals.',
+                      visualAction: 'Raw waveform in FL Studio with red warning badge.',
+                      audioMode: 'dry',
+                      badgeText: 'A/B: BEFORE (RAW DEMO)',
+                      subtitles: ['Stop', 'recording', 'amateur', 'sounds', 'in', 'FL', 'Studio.'],
+                    },
+                    {
+                      sceneNumber: 2,
+                      durationSec: 4,
+                      headline: `Lock in with ${pluginTitle}`,
+                      visualAction: 'Plugin interface engaged with instant snap dial turned to 100%.',
+                      audioMode: 'wet',
+                      badgeText: `A/B: AFTER (${pluginKey.toUpperCase()} ON)`,
+                      subtitles: ['One', 'click', 'and', 'the', 'tone', 'snaps', 'in', 'instantly.'],
+                    },
+                    {
+                      sceneNumber: 3,
+                      durationSec: 3,
+                      headline: 'Radio-ready sound in seconds.',
+                      visualAction: 'Full beat drop waveform with link in bio overlay.',
+                      audioMode: 'wet',
+                      badgeText: 'RADIO READY',
+                      subtitles: ['Stop', 'gatekeeping', 'your', 'sound.', 'Link', 'in', 'bio.'],
+                    },
+                  ],
+                };
               }
 
               if (candidateText.includes('[WRITTEN_BRIEFING]')) {
@@ -275,6 +390,7 @@ When explaining marketing funnels, TikTok concepts, PowerPoint presentations, vo
                 reply: advice,
                 speech: cleanSpeech,
                 deck: deckData,
+                videoAd: videoAdData,
                 dispatch: dispatchLogged,
                 source: `gemini-neural (${model.replace('models/', '')})`,
               });
