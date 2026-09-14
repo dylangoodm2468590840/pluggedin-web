@@ -35,6 +35,10 @@ import {
   Radio,
   Cpu,
   Terminal,
+  Sliders,
+  X,
+  MessageSquare,
+  Flame,
 } from 'lucide-react';
 
 interface Financials {
@@ -144,16 +148,19 @@ export default function FounderDashboardPage() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [authError, setAuthError] = useState('');
   const [timeframe, setTimeframe] = useState<'today' | '7d' | '30d' | 'ytd' | 'all'>('all');
-  const [activeTab, setActiveTab] = useState<'jarvis' | 'financials' | 'subs' | 'plugins' | 'traffic' | 'coupons' | 'customers' | 'sentinel'>('jarvis');
+  const [activeTab, setActiveTab] = useState<'jarvis' | 'financials' | 'subs' | 'plugins' | 'traffic' | 'coupons' | 'customers' | 'sentinel' | 'tools'>('jarvis');
   const [metrics, setMetrics] = useState<MetricsResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [searchCustomer, setSearchCustomer] = useState('');
   const [actionMessage, setActionMessage] = useState<string | null>(null);
 
-  // JARVIS Voice Engine state
+  // JARVIS Voice Engine & Mobile state
   const [isVoiceEnabled, setIsVoiceEnabled] = useState(true);
   const [isListening, setIsListening] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
+  const [mobileVoiceMode, setMobileVoiceMode] = useState<'hud' | 'chat'>('hud');
+  const [dictationModalOpen, setDictationModalOpen] = useState(false);
+  const [dictationInput, setDictationInput] = useState('');
   const [transcriptPreview, setTranscriptPreview] = useState('');
   const [aiPrompt, setAiPrompt] = useState('');
   const [aiChatHistory, setAiChatHistory] = useState<Array<{ role: 'user' | 'assistant'; text: string; speech?: string }>>([
@@ -169,6 +176,7 @@ export default function FounderDashboardPage() {
 
   const recognitionRef = useRef<any>(null);
   const chatBottomRef = useRef<HTMLDivElement>(null);
+  const handleSendAiPromptRef = useRef<(prompt?: string) => Promise<void>>(async () => {});
 
   // Auto-auth check on mount
   useEffect(() => {
@@ -179,94 +187,173 @@ export default function FounderDashboardPage() {
     }
   }, []);
 
-  // Initialize Web Speech Recognition
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-      if (SpeechRecognition) {
-        const reco = new SpeechRecognition();
-        reco.continuous = false;
-        reco.interimResults = true;
-        reco.lang = 'en-US';
-
-        reco.onresult = (event: any) => {
-          let currentTranscript = '';
-          for (let i = event.resultIndex; i < event.results.length; ++i) {
-            currentTranscript += event.results[i][0].transcript;
-          }
-          setTranscriptPreview(currentTranscript);
-          if (event.results[0].isFinal) {
-            handleSendAiPrompt(currentTranscript);
-            setTranscriptPreview('');
-            setIsListening(false);
-          }
-        };
-
-        reco.onerror = () => {
-          setIsListening(false);
-          setTranscriptPreview('');
-        };
-
-        reco.onend = () => {
-          setIsListening(false);
-        };
-
-        recognitionRef.current = reco;
+  // Unlock audio & haptics for iOS Safari / WebKit
+  const unlockAudioOnTouch = () => {
+    if (typeof window === 'undefined') return;
+    try {
+      if (window.speechSynthesis) {
+        window.speechSynthesis.resume();
+        const silent = new SpeechSynthesisUtterance(' ');
+        silent.volume = 0.01;
+        silent.rate = 2.0;
+        window.speechSynthesis.speak(silent);
       }
+    } catch (_) {}
+    try {
+      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+      if (AudioCtx) {
+        const ctx = new AudioCtx();
+        ctx.resume().then(() => ctx.close());
+      }
+    } catch (_) {}
+  };
+
+  const triggerHaptic = (pattern: number | number[] = 15) => {
+    if (typeof navigator !== 'undefined' && navigator.vibrate) {
+      try {
+        navigator.vibrate(pattern);
+      } catch (_) {}
     }
-  }, []);
+  };
 
   // Voice output synthesis (Jarvis speaks)
   const speakJarvisVoice = useCallback((textToSpeak: string) => {
     if (!isVoiceEnabled || typeof window === 'undefined' || !window.speechSynthesis) return;
 
-    window.speechSynthesis.cancel(); // Stop any ongoing speech
+    try {
+      window.speechSynthesis.cancel(); // Stop any ongoing speech
 
-    const cleanText = textToSpeak.replace(/[\#\*\_\[\]]/g, '').trim();
-    const utterance = new SpeechSynthesisUtterance(cleanText);
+      const cleanText = textToSpeak.replace(/[\#\*\_\[\]]/g, '').trim();
+      if (!cleanText) return;
 
-    // Prefer British English male voice for authentic Jarvis feel
-    const voices = window.speechSynthesis.getVoices();
-    const jarvisVoice =
-      voices.find((v) => v.lang === 'en-GB' && (v.name.includes('Daniel') || v.name.includes('George') || v.name.includes('Oliver') || v.name.includes('Male'))) ||
-      voices.find((v) => v.lang === 'en-GB') ||
-      voices.find((v) => v.name.includes('Google UK English Male')) ||
-      voices.find((v) => v.lang.startsWith('en'));
+      const utterance = new SpeechSynthesisUtterance(cleanText);
 
-    if (jarvisVoice) {
-      utterance.voice = jarvisVoice;
+      // Prefer British English male voice for authentic Jarvis feel
+      const voices = window.speechSynthesis.getVoices();
+      const jarvisVoice =
+        voices.find((v) => v.lang === 'en-GB' && (v.name.includes('Daniel') || v.name.includes('George') || v.name.includes('Oliver') || v.name.includes('Male'))) ||
+        voices.find((v) => v.lang === 'en-GB') ||
+        voices.find((v) => v.name.includes('Google UK English Male')) ||
+        voices.find((v) => v.lang.startsWith('en'));
+
+      if (jarvisVoice) {
+        utterance.voice = jarvisVoice;
+      }
+
+      utterance.rate = 1.0;
+      utterance.pitch = 0.95;
+
+      utterance.onstart = () => setIsSpeaking(true);
+      utterance.onend = () => setIsSpeaking(false);
+      utterance.onerror = () => setIsSpeaking(false);
+
+      window.speechSynthesis.resume();
+      window.speechSynthesis.speak(utterance);
+    } catch (e) {
+      console.warn('Speech error:', e);
+      setIsSpeaking(false);
     }
-
-    utterance.rate = 1.02;
-    utterance.pitch = 0.95;
-
-    utterance.onstart = () => setIsSpeaking(true);
-    utterance.onend = () => setIsSpeaking(false);
-    utterance.onerror = () => setIsSpeaking(false);
-
-    window.speechSynthesis.speak(utterance);
   }, [isVoiceEnabled]);
 
-  const toggleMic = () => {
-    if (!recognitionRef.current) {
-      alert('Speech recognition is not supported in this browser. Please use Chrome, Safari, or Edge.');
+  // Robust Dynamic Speech Recognition (Tap-to-Talk)
+  const toggleMic = async () => {
+    triggerHaptic(25);
+    unlockAudioOnTouch();
+
+    if (isListening) {
+      if (recognitionRef.current) {
+        try {
+          recognitionRef.current.stop();
+        } catch (_) {}
+      }
+      setIsListening(false);
       return;
     }
 
-    if (isListening) {
-      recognitionRef.current.stop();
-      setIsListening(false);
-    } else {
-      try {
-        if (typeof window !== 'undefined' && window.speechSynthesis) {
-          window.speechSynthesis.cancel();
-        }
-        setIsSpeaking(false);
-        recognitionRef.current.start();
-        setIsListening(true);
-      } catch (err) {
-        console.warn('Microphone error:', err);
+    const SpeechRecognition =
+      (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+
+    if (!SpeechRecognition) {
+      // In iOS Safari PWA standalone mode where Apple disables webkitSpeechRecognition:
+      setDictationModalOpen(true);
+      return;
+    }
+
+    try {
+      if (typeof window !== 'undefined' && window.speechSynthesis) {
+        window.speechSynthesis.cancel();
       }
+      setIsSpeaking(false);
+
+      // Check mic stream
+      if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          stream.getTracks().forEach((track) => track.stop());
+        } catch (micErr: any) {
+          if (micErr.name === 'NotAllowedError' || micErr.name === 'PermissionDeniedError') {
+            setActionMessage('⚠️ Microphone access denied. Allow microphone in iPhone Settings > Safari.');
+            setTimeout(() => setActionMessage(null), 6000);
+            return;
+          }
+        }
+      }
+
+      if (recognitionRef.current) {
+        try {
+          recognitionRef.current.abort();
+        } catch (_) {}
+      }
+
+      const reco = new SpeechRecognition();
+      reco.continuous = false;
+      reco.interimResults = true;
+      reco.lang = 'en-US';
+
+      reco.onstart = () => {
+        setIsListening(true);
+        setTranscriptPreview('');
+        triggerHaptic([10, 30]);
+      };
+
+      reco.onresult = (event: any) => {
+        let currentTranscript = '';
+        for (let i = event.resultIndex; i < event.results.length; ++i) {
+          currentTranscript += event.results[i][0].transcript;
+        }
+        setTranscriptPreview(currentTranscript);
+        if (event.results[event.results.length - 1]?.isFinal) {
+          const finalPrompt = currentTranscript.trim();
+          setIsListening(false);
+          setTranscriptPreview('');
+          if (finalPrompt) {
+            handleSendAiPromptRef.current(finalPrompt);
+          }
+        }
+      };
+
+      reco.onerror = (event: any) => {
+        console.warn('SpeechRecognition error:', event.error);
+        setIsListening(false);
+        setTranscriptPreview('');
+        if (event.error === 'not-allowed') {
+          setActionMessage('⚠️ Microphone blocked. Tap Settings to enable.');
+          setTimeout(() => setActionMessage(null), 6000);
+        } else if (event.error !== 'no-speech') {
+          setDictationModalOpen(true);
+        }
+      };
+
+      reco.onend = () => {
+        setIsListening(false);
+      };
+
+      recognitionRef.current = reco;
+      reco.start();
+    } catch (err: any) {
+      console.warn('Could not start speech recognition:', err);
+      setIsListening(false);
+      setDictationModalOpen(true);
     }
   };
 
@@ -401,6 +488,9 @@ export default function FounderDashboardPage() {
     const query = promptToSend || aiPrompt;
     if (!query.trim() || aiLoading) return;
 
+    unlockAudioOnTouch();
+    triggerHaptic(15);
+
     const newHistory = [...aiChatHistory, { role: 'user' as const, text: query }];
     setAiChatHistory(newHistory);
     setAiPrompt('');
@@ -457,6 +547,10 @@ export default function FounderDashboardPage() {
       }, 100);
     }
   };
+
+  useEffect(() => {
+    handleSendAiPromptRef.current = handleSendAiPrompt;
+  });
 
   // PIN SHIELD VIEW
   if (!isAuthenticated) {
@@ -771,8 +865,8 @@ export default function FounderDashboardPage() {
           </div>
         </div>
 
-        {/* Section Navigation Tabs */}
-        <div className="flex items-center space-x-2 border-b border-slate-800 pb-1 overflow-x-auto">
+        {/* Section Navigation Tabs (Desktop) */}
+        <div className="hidden md:flex items-center space-x-2 border-b border-slate-800 pb-1 overflow-x-auto">
           {[
             { id: 'jarvis', label: 'J.A.R.V.I.S. Voice AI', icon: Bot },
             { id: 'sentinel', label: '24/7 Sentinel Watchdog', icon: Activity },
@@ -788,7 +882,10 @@ export default function FounderDashboardPage() {
             return (
               <button
                 key={tab.id}
-                onClick={() => setActiveTab(tab.id as any)}
+                onClick={() => {
+                  triggerHaptic(10);
+                  setActiveTab(tab.id as any);
+                }}
                 className={`flex items-center space-x-2 px-4 py-2.5 rounded-2xl text-xs font-bold transition-all whitespace-nowrap ${
                   active
                     ? 'bg-slate-800 text-cyber-cyan border border-cyber-cyan/30 shadow-sm'
@@ -805,162 +902,313 @@ export default function FounderDashboardPage() {
         {/* TAB: J.A.R.V.I.S. VOICE AI & ARC REACTOR */}
         {activeTab === 'jarvis' && (
           <div className="space-y-6">
-            {/* Holographic Arc Reactor Hub */}
-            <div className="bg-gradient-to-b from-slate-900 via-slate-900/90 to-slate-950 border border-slate-800 rounded-3xl p-6 sm:p-8 flex flex-col items-center text-center relative overflow-hidden">
-              <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(0,240,255,0.08)_0,transparent_70%)] pointer-events-none" />
-
-              {/* Arc Reactor Sphere */}
-              <div className="relative my-4">
-                {/* Outer Ring */}
-                <div
-                  className={`w-32 h-32 sm:w-40 sm:h-40 rounded-full border border-cyber-cyan/30 flex items-center justify-center relative transition-all duration-500 ${
-                    isListening
-                      ? 'shadow-[0_0_50px_rgba(0,240,255,0.6)] border-cyber-cyan animate-pulse'
-                      : isSpeaking
-                      ? 'shadow-[0_0_60px_rgba(168,85,247,0.6)] border-purple-400 animate-pulse'
-                      : 'hover:shadow-[0_0_30px_rgba(0,240,255,0.3)]'
+            {/* View Mode Switcher (Voice HUD vs Chat Stream) */}
+            <div className="flex items-center justify-center">
+              <div className="bg-slate-900/90 p-1 rounded-2xl border border-slate-800 flex items-center space-x-1 shadow-md">
+                <button
+                  type="button"
+                  onClick={() => {
+                    triggerHaptic(10);
+                    setMobileVoiceMode('hud');
+                  }}
+                  className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center space-x-2 ${
+                    mobileVoiceMode === 'hud'
+                      ? 'bg-gradient-to-r from-cyber-cyan to-blue-600 text-black shadow-glow-cyan font-black'
+                      : 'text-slate-400 hover:text-white'
                   }`}
                 >
-                  {/* Rotating Inner Segments */}
-                  <div className={`absolute inset-2 rounded-full border border-dashed border-cyber-cyan/40 ${isSpeaking ? 'animate-spin-slow' : ''}`} />
+                  <Mic className="w-3.5 h-3.5" />
+                  <span>Holographic Voice HUD</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    triggerHaptic(10);
+                    setMobileVoiceMode('chat');
+                  }}
+                  className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center space-x-2 ${
+                    mobileVoiceMode === 'chat'
+                      ? 'bg-gradient-to-r from-cyber-cyan to-blue-600 text-black shadow-glow-cyan font-black'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  <MessageSquare className="w-3.5 h-3.5" />
+                  <span>Communication Stream</span>
+                </button>
+              </div>
+            </div>
 
-                  {/* Core Mic Button */}
+            {/* MODE 1: HOLOGRAPHIC VOICE HUD */}
+            {mobileVoiceMode === 'hud' ? (
+              <div className="bg-gradient-to-b from-slate-900 via-slate-900/95 to-slate-950 border border-slate-800 rounded-3xl p-6 sm:p-10 flex flex-col items-center text-center relative overflow-hidden shadow-2xl">
+                <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(0,240,255,0.1)_0,transparent_70%)] pointer-events-none" />
+
+                {/* Arc Reactor Sphere */}
+                <div className="relative my-4">
+                  {/* Outer Glowing Ring */}
+                  <div
+                    className={`w-36 h-36 sm:w-48 sm:h-48 rounded-full border border-cyber-cyan/40 flex items-center justify-center relative transition-all duration-500 ${
+                      isListening
+                        ? 'shadow-[0_0_60px_rgba(244,63,94,0.7)] border-rose-500 animate-pulse'
+                        : isSpeaking
+                        ? 'shadow-[0_0_60px_rgba(168,85,247,0.7)] border-purple-400 animate-pulse'
+                        : 'shadow-[0_0_40px_rgba(0,240,255,0.25)] hover:shadow-[0_0_50px_rgba(0,240,255,0.5)]'
+                    }`}
+                  >
+                    {/* Rotating Segments */}
+                    <div
+                      className={`absolute inset-2.5 rounded-full border border-dashed border-cyber-cyan/50 ${
+                        isSpeaking ? 'animate-spin-slow' : isListening ? 'animate-spin' : ''
+                      }`}
+                    />
+
+                    {/* Core Mic Button */}
+                    <button
+                      type="button"
+                      onClick={toggleMic}
+                      className={`w-24 h-24 sm:w-32 sm:h-32 rounded-full flex flex-col items-center justify-center transition-all z-10 select-none touch-manipulation active:scale-95 ${
+                        isListening
+                          ? 'bg-rose-500 text-white shadow-xl scale-105'
+                          : isSpeaking
+                          ? 'bg-gradient-to-tr from-purple-600 to-cyber-cyan text-white shadow-glow-cyan scale-105'
+                          : 'bg-slate-950 border-2 border-cyber-cyan/50 text-cyber-cyan shadow-glow-cyan'
+                      }`}
+                    >
+                      {isListening ? (
+                        <>
+                          <MicOff className="w-9 h-9 animate-pulse" />
+                          <span className="text-[10px] font-mono mt-1.5 uppercase font-bold tracking-wider">Listening</span>
+                        </>
+                      ) : isSpeaking ? (
+                        <>
+                          <Volume2 className="w-9 h-9 animate-bounce" />
+                          <span className="text-[10px] font-mono mt-1.5 uppercase font-bold tracking-wider">Speaking</span>
+                        </>
+                      ) : (
+                        <>
+                          <Mic className="w-9 h-9" />
+                          <span className="text-[10px] font-mono mt-1.5 uppercase font-bold tracking-wider">Tap to Talk</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Animated Audio Soundwave Bars */}
+                <div className="flex items-center space-x-1.5 h-8 justify-center my-3">
+                  <span className={`w-1 rounded-full transition-all duration-150 ${isListening ? 'bg-rose-400 h-7 animate-pulse' : isSpeaking ? 'bg-purple-400 h-6 animate-pulse' : 'bg-slate-700 h-1.5 opacity-40'}`} />
+                  <span className={`w-1 rounded-full transition-all duration-150 ${isListening ? 'bg-rose-400 h-5 animate-bounce' : isSpeaking ? 'bg-cyber-cyan h-8 animate-bounce' : 'bg-slate-700 h-1.5 opacity-40'}`} />
+                  <span className={`w-1.5 rounded-full transition-all duration-150 ${isListening ? 'bg-rose-400 h-8 animate-pulse' : isSpeaking ? 'bg-purple-400 h-7 animate-pulse' : 'bg-slate-700 h-2 opacity-40'}`} />
+                  <span className={`w-1 rounded-full transition-all duration-150 ${isListening ? 'bg-rose-400 h-6 animate-bounce' : isSpeaking ? 'bg-cyber-cyan h-5 animate-bounce' : 'bg-slate-700 h-1.5 opacity-40'}`} />
+                  <span className={`w-1 rounded-full transition-all duration-150 ${isListening ? 'bg-rose-400 h-4 animate-pulse' : isSpeaking ? 'bg-purple-400 h-4 animate-pulse' : 'bg-slate-700 h-1.5 opacity-40'}`} />
+                </div>
+
+                {/* Status & Live Transcription */}
+                <div className="max-w-md w-full">
+                  <div className="flex items-center justify-center space-x-2 text-xs font-mono text-slate-300">
+                    <span
+                      className={`h-2.5 w-2.5 rounded-full ${
+                        isListening
+                          ? 'bg-rose-500 animate-ping'
+                          : isSpeaking
+                          ? 'bg-purple-400 animate-pulse'
+                          : aiLoading
+                          ? 'bg-cyber-cyan animate-spin'
+                          : 'bg-emerald-400'
+                      }`}
+                    />
+                    <span className="font-semibold">
+                      {isListening
+                        ? 'J.A.R.V.I.S. is listening... tap when finished'
+                        : isSpeaking
+                        ? 'J.A.R.V.I.S. is speaking aloud...'
+                        : aiLoading
+                        ? 'J.A.R.V.I.S. is calculating figures...'
+                        : 'Voice Interface Ready • Tap Arc Reactor to speak'}
+                    </span>
+                  </div>
+
+                  {transcriptPreview && (
+                    <div className="mt-3 p-3.5 rounded-2xl bg-cyber-cyan/15 border border-cyber-cyan/40 text-cyber-cyan text-sm font-medium animate-pulse shadow-md">
+                      "{transcriptPreview}"
+                    </div>
+                  )}
+                </div>
+
+                {/* Big Thumb-Friendly Controls for Mobile */}
+                <div className="mt-6 flex flex-col sm:flex-row items-center justify-center gap-3 w-full max-w-md">
                   <button
                     type="button"
                     onClick={toggleMic}
-                    className={`w-20 h-20 sm:w-24 sm:h-24 rounded-full flex flex-col items-center justify-center transition-all z-10 ${
+                    className={`w-full py-4 px-6 rounded-2xl font-black text-xs uppercase tracking-wider transition-all flex items-center justify-center space-x-2 shadow-lg active:scale-98 ${
                       isListening
-                        ? 'bg-rose-500 text-white shadow-lg scale-105'
+                        ? 'bg-rose-500 text-white animate-pulse shadow-[0_0_30px_rgba(244,63,94,0.5)]'
                         : isSpeaking
-                        ? 'bg-gradient-to-tr from-purple-600 to-cyber-cyan text-white shadow-glow-cyan'
-                        : 'bg-slate-950 border border-cyber-cyan/40 text-cyber-cyan hover:scale-105 shadow-glow-cyan'
+                        ? 'bg-purple-600 text-white shadow-glow-purple'
+                        : 'bg-gradient-to-r from-cyber-cyan to-blue-600 text-black shadow-glow-cyan hover:brightness-110'
                     }`}
                   >
                     {isListening ? (
                       <>
-                        <MicOff className="w-8 h-8 animate-pulse" />
-                        <span className="text-[9px] font-mono mt-1 uppercase font-bold">Listening</span>
+                        <MicOff className="w-4 h-4" />
+                        <span>Finish & Send to J.A.R.V.I.S.</span>
                       </>
                     ) : isSpeaking ? (
                       <>
-                        <Volume2 className="w-8 h-8 animate-bounce" />
-                        <span className="text-[9px] font-mono mt-1 uppercase font-bold">Speaking</span>
+                        <VolumeX className="w-4 h-4" />
+                        <span>Tap to Mute Voice</span>
                       </>
                     ) : (
                       <>
-                        <Mic className="w-8 h-8" />
-                        <span className="text-[9px] font-mono mt-1 uppercase font-bold">Tap to Talk</span>
+                        <Mic className="w-4 h-4" />
+                        <span>Tap to Speak with J.A.R.V.I.S.</span>
                       </>
                     )}
                   </button>
-                </div>
-              </div>
 
-              {/* Status & Live Transcription */}
-              <div className="max-w-xl">
-                <div className="flex items-center justify-center space-x-2 text-xs font-mono text-slate-400">
-                  <span className={`h-2 w-2 rounded-full ${isListening ? 'bg-rose-500 animate-ping' : isSpeaking ? 'bg-purple-400 animate-pulse' : 'bg-emerald-400'}`} />
-                  <span>
-                    {isListening
-                      ? 'J.A.R.V.I.S. is listening to your voice...'
-                      : isSpeaking
-                      ? 'J.A.R.V.I.S. is speaking aloud...'
-                      : 'Voice Interface Ready • Tap Arc Reactor to speak'}
-                  </span>
-                </div>
-
-                {transcriptPreview && (
-                  <div className="mt-3 p-3 rounded-2xl bg-cyber-cyan/10 border border-cyber-cyan/30 text-cyber-cyan text-sm font-medium animate-pulse">
-                    "{transcriptPreview}"
-                  </div>
-                )}
-              </div>
-
-              {/* Quick Voice Command Chips */}
-              <div className="mt-6 flex flex-wrap justify-center gap-2 max-w-2xl">
-                {[
-                  '🎙️ Jarvis, how are our sales looking today?',
-                  '🎙️ Jarvis, write 3 viral TikTok hooks for PLUGTNE',
-                  '🎙️ Jarvis, what bundle should we launch this weekend?',
-                  '🎙️ Jarvis, how do we hit $10k MRR this month?',
-                  '🎙️ Jarvis, tell Antigravity to add sticky mobile checkout bar',
-                ].map((chip) => (
                   <button
-                    key={chip}
-                    onClick={() => handleSendAiPrompt(chip.replace('🎙️ ', ''))}
-                    className="px-3.5 py-1.5 rounded-xl bg-slate-950/80 border border-slate-800 text-slate-300 hover:text-white hover:border-cyber-cyan text-xs font-medium transition-all"
+                    type="button"
+                    onClick={() => {
+                      triggerHaptic(10);
+                      unlockAudioOnTouch();
+                      setDictationModalOpen(true);
+                    }}
+                    className="w-full sm:w-auto py-3 px-4 rounded-2xl bg-slate-900 border border-slate-700 text-slate-300 hover:text-white hover:border-slate-500 text-xs font-semibold flex items-center justify-center space-x-2 transition-all active:scale-98"
                   >
-                    {chip}
+                    <MessageSquare className="w-3.5 h-3.5 text-cyber-cyan" />
+                    <span>Type or Siri Dictate</span>
                   </button>
-                ))}
-              </div>
-            </div>
+                </div>
 
-            {/* Conversation Ledger */}
-            <div className="bg-slate-900/80 border border-slate-800 rounded-3xl p-6 space-y-4">
-              <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-                <h3 className="text-sm font-bold text-white uppercase tracking-wider flex items-center space-x-2">
-                  <Radio className="w-4 h-4 text-cyber-cyan" />
-                  <span>J.A.R.V.I.S. Communication Stream</span>
-                </h3>
-                <span className="text-[10px] font-mono text-slate-400">Continuous Context Enabled</span>
-              </div>
-
-              {/* Chat Log */}
-              <div className="space-y-4 max-h-[500px] overflow-y-auto p-4 bg-slate-950/80 rounded-2xl border border-slate-800/80">
-                {aiChatHistory.map((msg, i) => (
-                  <div
-                    key={i}
-                    className={`flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'}`}
-                  >
-                    <div className="text-[10px] font-mono text-slate-500 mb-1 px-1">
-                      {msg.role === 'user' ? 'DYLAN (FOUNDER)' : 'J.A.R.V.I.S. (EXECUTIVE AI)'}
-                    </div>
-                    <div
-                      className={`max-w-[90%] rounded-2xl p-4 text-xs sm:text-sm leading-relaxed ${
-                        msg.role === 'user'
-                          ? 'bg-gradient-to-r from-cyber-cyan to-blue-600 text-black font-semibold'
-                          : 'bg-slate-900 border border-slate-800 text-slate-200'
-                      }`}
-                    >
-                      <div className="whitespace-pre-wrap">{msg.text}</div>
-                    </div>
+                {/* Quick Voice Command Chips (Swipeable) */}
+                <div className="mt-6 w-full max-w-2xl">
+                  <div className="flex items-center space-x-2 overflow-x-auto pb-2 no-scrollbar">
+                    {[
+                      "🎙️ Today's Net Sales",
+                      "🎙️ 3 Viral TikTok Hooks",
+                      "🎙️ How to Hit $10k MRR",
+                      "🎙️ Tell Antigravity to check mobile bar",
+                      "🎙️ What plugin is selling most?",
+                    ].map((chip) => (
+                      <button
+                        key={chip}
+                        onClick={() => {
+                          triggerHaptic(15);
+                          handleSendAiPrompt(
+                            chip === "🎙️ Today's Net Sales"
+                              ? "Jarvis, how are our net take-home sales looking today?"
+                              : chip === "🎙️ 3 Viral TikTok Hooks"
+                              ? "Jarvis, write 3 viral TikTok hooks for PLUGTNE"
+                              : chip === "🎙️ How to Hit $10k MRR"
+                              ? "Jarvis, what is our exact strategy to hit $10,000 MRR this month?"
+                              : chip === "🎙️ Tell Antigravity to check mobile bar"
+                              ? "Jarvis, tell Antigravity to check mobile checkout bar"
+                              : "Jarvis, which audio plugin has the highest customer demand right now?"
+                          );
+                        }}
+                        className="px-4 py-2 rounded-xl bg-slate-950/80 border border-slate-800 text-slate-300 hover:text-white hover:border-cyber-cyan text-xs font-medium transition-all whitespace-nowrap active:scale-95 shrink-0"
+                      >
+                        {chip}
+                      </button>
+                    ))}
                   </div>
-                ))}
+                </div>
 
-                {aiLoading && (
-                  <div className="flex items-center space-x-2 text-cyber-cyan text-xs p-3 bg-slate-900/60 rounded-xl w-fit">
-                    <RefreshCw className="w-4 h-4 animate-spin" />
-                    <span>J.A.R.V.I.S. is calculating figures and formulating strategy...</span>
+                {/* Latest Executive Response Card (Voice HUD Mode) */}
+                {aiChatHistory.length > 0 && (
+                  <div className="mt-6 w-full max-w-2xl bg-slate-950/90 border border-slate-800/90 rounded-2xl p-5 text-left space-y-3">
+                    <div className="flex items-center justify-between border-b border-slate-800/80 pb-2">
+                      <div className="flex items-center space-x-2">
+                        <Bot className="w-4 h-4 text-cyber-cyan" />
+                        <span className="text-xs font-black text-white uppercase tracking-wider">
+                          Latest Briefing from J.A.R.V.I.S.
+                        </span>
+                      </div>
+                      {aiChatHistory[aiChatHistory.length - 1].speech && (
+                        <button
+                          onClick={() =>
+                            speakJarvisVoice(aiChatHistory[aiChatHistory.length - 1].speech || '')
+                          }
+                          className="text-[11px] text-cyber-cyan hover:underline flex items-center space-x-1"
+                        >
+                          <Volume2 className="w-3.5 h-3.5" />
+                          <span>Replay Audio</span>
+                        </button>
+                      )}
+                    </div>
+                    <div className="text-xs sm:text-sm text-slate-300 leading-relaxed whitespace-pre-wrap max-h-60 overflow-y-auto pr-1">
+                      {aiChatHistory[aiChatHistory.length - 1].text}
+                    </div>
                   </div>
                 )}
-                <div ref={chatBottomRef} />
               </div>
+            ) : (
+              /* MODE 2: COMMUNICATION STREAM */
+              <div className="bg-slate-900/80 border border-slate-800 rounded-3xl p-6 space-y-4">
+                <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                  <h3 className="text-sm font-bold text-white uppercase tracking-wider flex items-center space-x-2">
+                    <Radio className="w-4 h-4 text-cyber-cyan" />
+                    <span>J.A.R.V.I.S. Communication Stream</span>
+                  </h3>
+                  <span className="text-[10px] font-mono text-slate-400">Continuous Context Enabled</span>
+                </div>
 
-              {/* Text Input Form */}
-              <form
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  handleSendAiPrompt();
-                }}
-                className="flex items-center space-x-2"
-              >
-                <input
-                  type="text"
-                  value={aiPrompt}
-                  onChange={(e) => setAiPrompt(e.target.value)}
-                  placeholder="Ask J.A.R.V.I.S. anything or give an engineering command..."
-                  className="flex-1 bg-slate-950 border border-slate-800 rounded-2xl px-4 py-3.5 text-xs sm:text-sm text-white focus:outline-none focus:border-cyber-cyan transition-all"
-                />
-                <button
-                  type="submit"
-                  disabled={aiLoading || !aiPrompt.trim()}
-                  className="px-5 py-3.5 rounded-2xl bg-gradient-to-r from-cyber-cyan to-blue-600 text-black font-bold text-xs uppercase shadow-glow-cyan hover:brightness-110 active:scale-95 transition-all disabled:opacity-40"
+                {/* Chat Log */}
+                <div className="space-y-4 max-h-[500px] overflow-y-auto p-4 bg-slate-950/80 rounded-2xl border border-slate-800/80">
+                  {aiChatHistory.map((msg, i) => (
+                    <div
+                      key={i}
+                      className={`flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'}`}
+                    >
+                      <div className="text-[10px] font-mono text-slate-500 mb-1 px-1">
+                        {msg.role === 'user' ? 'DYLAN (FOUNDER)' : 'J.A.R.V.I.S. (EXECUTIVE AI)'}
+                      </div>
+                      <div
+                        className={`max-w-[90%] rounded-2xl p-4 text-xs sm:text-sm leading-relaxed ${
+                          msg.role === 'user'
+                            ? 'bg-gradient-to-r from-cyber-cyan to-blue-600 text-black font-semibold'
+                            : 'bg-slate-900 border border-slate-800 text-slate-200'
+                        }`}
+                      >
+                        <div className="whitespace-pre-wrap">{msg.text}</div>
+                      </div>
+                    </div>
+                  ))}
+
+                  {aiLoading && (
+                    <div className="flex items-center space-x-2 text-cyber-cyan text-xs p-3 bg-slate-900/60 rounded-xl w-fit">
+                      <RefreshCw className="w-4 h-4 animate-spin" />
+                      <span>J.A.R.V.I.S. is calculating figures and formulating strategy...</span>
+                    </div>
+                  )}
+                  <div ref={chatBottomRef} />
+                </div>
+
+                {/* Text Input Form */}
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    handleSendAiPrompt();
+                  }}
+                  className="flex items-center space-x-2"
                 >
-                  <Send className="w-4 h-4" />
-                </button>
-              </form>
-            </div>
+                  <input
+                    type="text"
+                    value={aiPrompt}
+                    onChange={(e) => setAiPrompt(e.target.value)}
+                    placeholder="Ask J.A.R.V.I.S. anything or give an engineering command..."
+                    className="flex-1 bg-slate-950 border border-slate-800 rounded-2xl px-4 py-3.5 text-xs sm:text-sm text-white focus:outline-none focus:border-cyber-cyan transition-all"
+                  />
+                  <button
+                    type="submit"
+                    disabled={aiLoading || !aiPrompt.trim()}
+                    className="px-5 py-3.5 rounded-2xl bg-gradient-to-r from-cyber-cyan to-blue-600 text-black font-bold text-xs uppercase shadow-glow-cyan hover:brightness-110 active:scale-95 transition-all disabled:opacity-40"
+                  >
+                    <Send className="w-4 h-4" />
+                  </button>
+                </form>
+              </div>
+            )}
           </div>
         )}
 
@@ -1524,7 +1772,229 @@ export default function FounderDashboardPage() {
             </div>
           </div>
         )}
+
+        {/* TAB: TOOLS & ADVANCED CONTROLS (Mobile & Desktop) */}
+        {activeTab === 'tools' && (
+          <div className="space-y-6">
+            <div className="bg-slate-900/80 border border-slate-800 rounded-3xl p-6 space-y-6">
+              <div>
+                <h2 className="text-base font-black text-white flex items-center space-x-2">
+                  <Sliders className="w-5 h-5 text-cyber-cyan" />
+                  <span>Executive Founder Tools & Controls</span>
+                </h2>
+                <p className="text-xs text-slate-400 mt-1">
+                  1-click sales simulations, ledger purges, master VIP codes, and deep analytics
+                </p>
+              </div>
+
+              {/* 1. Quick Financial Actions */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="p-4 rounded-2xl bg-rose-500/10 border border-rose-500/30 space-y-2">
+                  <span className="text-xs font-bold text-rose-300 flex items-center space-x-1.5">
+                    <Trash2 className="w-4 h-4 text-rose-400" />
+                    <span>Purge Test Sales Ledger</span>
+                  </span>
+                  <p className="text-[11px] text-slate-300">
+                    Permanently purge simulated transactions to keep your true net profit 100% verified.
+                  </p>
+                  <button
+                    onClick={handlePurgeTestOrders}
+                    className="w-full py-2.5 rounded-xl bg-rose-500 text-white font-black text-xs uppercase tracking-wider hover:bg-rose-600 transition-all shadow-md active:scale-95"
+                  >
+                    Purge All Simulated Sales
+                  </button>
+                </div>
+
+                <div className="p-4 rounded-2xl bg-purple-500/10 border border-purple-500/30 space-y-2">
+                  <span className="text-xs font-bold text-purple-300 flex items-center space-x-1.5">
+                    <Zap className="w-4 h-4 text-purple-400" />
+                    <span>Simulate Customer Order</span>
+                  </span>
+                  <p className="text-[11px] text-slate-300">
+                    Trigger an authentic order payload to test telemetry and push notification alerts.
+                  </p>
+                  <button
+                    onClick={handleCreateTestSale}
+                    className="w-full py-2.5 rounded-xl bg-purple-600 text-white font-black text-xs uppercase tracking-wider hover:bg-purple-700 transition-all shadow-md active:scale-95"
+                  >
+                    Simulate $79 Order
+                  </button>
+                </div>
+              </div>
+
+              {/* 2. Master VIP Pass Key Box */}
+              <div className="p-4 rounded-2xl bg-slate-950 border border-cyber-cyan/30 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-2">
+                    <Tag className="w-4 h-4 text-cyber-cyan" />
+                    <span className="text-xs font-bold text-white uppercase tracking-wider">
+                      Master VIP Pass Key (For Close Friends)
+                    </span>
+                  </div>
+                  <span className="text-[10px] font-mono bg-cyber-cyan/20 text-cyber-cyan px-2 py-0.5 rounded-full font-bold">
+                    100% OFF UNGUESSABLE
+                  </span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <input
+                    type="text"
+                    readOnly
+                    value="PLUGGED-VIP-DYLAN-8492-X9Q7"
+                    className="flex-1 font-mono text-xs bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 text-cyber-cyan focus:outline-none select-all"
+                  />
+                  <button
+                    onClick={() => {
+                      navigator.clipboard.writeText('PLUGGED-VIP-DYLAN-8492-X9Q7');
+                      setActionMessage('📋 Copied Master VIP Key to clipboard!');
+                      setTimeout(() => setActionMessage(null), 4000);
+                    }}
+                    className="px-4 py-2.5 rounded-xl bg-cyber-cyan text-black font-black text-xs uppercase hover:brightness-110 active:scale-95 transition-all shadow-glow-cyan shrink-0"
+                  >
+                    Copy Key
+                  </button>
+                </div>
+                <p className="text-[11px] text-slate-400">
+                  Send this code directly to your friends. They enter it on /checkout or /account for 100% free lifetime access with 5 machine slots.
+                </p>
+              </div>
+
+              {/* 3. Sub-View Selectors for Mobile */}
+              <div className="border-t border-slate-800 pt-4 space-y-3">
+                <span className="text-xs font-bold text-slate-400 block uppercase tracking-wider">
+                  Browse Analytics Subsystems
+                </span>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    onClick={() => setActiveTab('plugins')}
+                    className="p-3 rounded-xl bg-slate-950 border border-slate-800 hover:border-slate-700 text-left text-xs flex items-center space-x-2 text-slate-300"
+                  >
+                    <Layers className="w-4 h-4 text-cyber-purple" />
+                    <span>Plugin Leaderboard</span>
+                  </button>
+                  <button
+                    onClick={() => setActiveTab('traffic')}
+                    className="p-3 rounded-xl bg-slate-950 border border-slate-800 hover:border-slate-700 text-left text-xs flex items-center space-x-2 text-slate-300"
+                  >
+                    <BarChart3 className="w-4 h-4 text-cyber-cyan" />
+                    <span>Traffic & Funnels</span>
+                  </button>
+                  <button
+                    onClick={() => setActiveTab('coupons')}
+                    className="p-3 rounded-xl bg-slate-950 border border-slate-800 hover:border-slate-700 text-left text-xs flex items-center space-x-2 text-slate-300"
+                  >
+                    <Tag className="w-4 h-4 text-emerald-400" />
+                    <span>Disputes & Health</span>
+                  </button>
+                  <button
+                    onClick={() => setActiveTab('customers')}
+                    className="p-3 rounded-xl bg-slate-950 border border-slate-800 hover:border-slate-700 text-left text-xs flex items-center space-x-2 text-slate-300"
+                  >
+                    <Users className="w-4 h-4 text-blue-400" />
+                    <span>Customer Machines</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </main>
+
+      {/* Mobile Fixed Bottom iOS Nav Bar */}
+      <nav className="fixed bottom-0 inset-x-0 bg-slate-950/95 backdrop-blur-xl border-t border-slate-800/90 z-40 md:hidden px-3 pt-2 pb-[max(env(safe-area-inset-bottom),0.75rem)] shadow-2xl">
+        <div className="grid grid-cols-5 gap-1">
+          {[
+            { id: 'jarvis', label: 'J.A.R.V.I.S.', icon: Bot },
+            { id: 'financials', label: 'Sales', icon: DollarSign },
+            { id: 'subs', label: 'Users', icon: Users },
+            { id: 'sentinel', label: 'Sentinel', icon: Activity },
+            { id: 'tools', label: 'Tools', icon: Sliders },
+          ].map((item) => {
+            const Icon = item.icon;
+            const isTabActive =
+              activeTab === item.id ||
+              (item.id === 'tools' && ['plugins', 'traffic', 'coupons', 'customers', 'tools'].includes(activeTab));
+            return (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => {
+                  triggerHaptic(15);
+                  unlockAudioOnTouch();
+                  setActiveTab(item.id as any);
+                }}
+                className={`flex flex-col items-center justify-center py-1 rounded-xl transition-all select-none touch-manipulation active:scale-95 ${
+                  isTabActive ? 'text-cyber-cyan font-bold' : 'text-slate-500 hover:text-slate-300'
+                }`}
+              >
+                <div
+                  className={`w-8 h-8 rounded-xl flex items-center justify-center transition-all ${
+                    isTabActive
+                      ? 'bg-cyber-cyan/15 border border-cyber-cyan/40 shadow-glow-cyan'
+                      : ''
+                  }`}
+                >
+                  <Icon className={`w-4 h-4 ${isTabActive ? 'text-cyber-cyan' : 'text-slate-500'}`} />
+                </div>
+                <span className="text-[10px] mt-1 font-semibold tracking-tight">{item.label}</span>
+              </button>
+            );
+          })}
+        </div>
+      </nav>
+
+      {/* Siri Dictation & Voice Typing Modal (iOS Fallback) */}
+      {dictationModalOpen && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-end sm:items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="bg-slate-900 border border-cyber-cyan/40 rounded-3xl w-full max-w-lg p-5 sm:p-6 space-y-4 shadow-[0_0_50px_rgba(0,240,255,0.25)]">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <div className="flex items-center space-x-2.5">
+                <div className="w-9 h-9 rounded-xl bg-cyber-cyan/20 border border-cyber-cyan/40 flex items-center justify-center">
+                  <Bot className="w-5 h-5 text-cyber-cyan" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-black text-white">Speak with J.A.R.V.I.S.</h3>
+                  <p className="text-[10px] text-slate-400">Tap below and use keyboard 🎙️ Siri mic or type</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setDictationModalOpen(false)}
+                className="p-2 rounded-xl bg-slate-800 text-slate-400 hover:text-white transition-all active:scale-95"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <textarea
+              autoFocus
+              rows={4}
+              value={dictationInput}
+              onChange={(e) => setDictationInput(e.target.value)}
+              placeholder="Tap here and use Siri Dictation (the microphone key next to spacebar on your iPhone) or type your message to J.A.R.V.I.S..."
+              className="w-full p-4 rounded-2xl bg-slate-950 border border-slate-700 text-white text-sm focus:outline-none focus:border-cyber-cyan transition-all"
+            />
+
+            <div className="flex items-center space-x-2">
+              <button
+                type="button"
+                onClick={() => {
+                  if (dictationInput.trim()) {
+                    triggerHaptic(20);
+                    handleSendAiPrompt(dictationInput.trim());
+                    setDictationInput('');
+                    setDictationModalOpen(false);
+                  }
+                }}
+                disabled={!dictationInput.trim() || aiLoading}
+                className="flex-1 py-3.5 rounded-2xl bg-gradient-to-r from-cyber-cyan to-blue-600 text-black font-black text-xs uppercase tracking-wider shadow-glow-cyan hover:brightness-110 active:scale-98 transition-all disabled:opacity-40 flex items-center justify-center space-x-2"
+              >
+                <Send className="w-4 h-4" />
+                <span>Send to J.A.R.V.I.S.</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
