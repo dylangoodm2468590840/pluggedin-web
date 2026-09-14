@@ -10,8 +10,14 @@ export async function GET(req: NextRequest) {
 
   const rawText = req.nextUrl.searchParams.get('text') || '';
   const cleanText = rawText
-    .replace(/[^a-zA-Z0-9\s.,!?'$-]/g, ' ')
-    .slice(0, 300)
+    .replace(/\[[A-Z_]+\]/g, '') // strip brackets like [VOICE_SPEECH]
+    .replace(/\[([^\]]+)\]\([^\)]+\)/g, '$1') // strip markdown links
+    .replace(/```[\s\S]*?```/g, '') // strip code blocks
+    .replace(/`([^`]+)`/g, '$1') // strip inline code
+    .replace(/[*#_~>]/g, ' ') // strip markdown formatting characters
+    .replace(/[^a-zA-Z0-9\s.,!?'$%\/-]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .slice(0, 350)
     .trim();
 
   if (!cleanText) {

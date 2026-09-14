@@ -162,6 +162,21 @@ export default function FounderDashboardPage() {
   const [searchCustomer, setSearchCustomer] = useState('');
   const [actionMessage, setActionMessage] = useState<string | null>(null);
 
+  // J.A.R.V.I.S. Next-Gen Voice & Screen Control Architecture
+  const speechGenIdRef = useRef<number>(0);
+  const activeAudioRef = useRef<HTMLAudioElement | null>(null);
+  const [isContinuousMode, setIsContinuousMode] = useState(false);
+  const isContinuousModeRef = useRef(false);
+  useEffect(() => {
+    isContinuousModeRef.current = isContinuousMode;
+  }, [isContinuousMode]);
+
+  const [spotlightTarget, setSpotlightTarget] = useState<string | null>(null);
+  const [spotlightCaption, setSpotlightCaption] = useState<string | null>(null);
+  const [hasPlayedStartupBriefing, setHasPlayedStartupBriefing] = useState(false);
+  const triggerAutoListenRef = useRef<() => void>(() => {});
+
+
   // JARVIS Voice Engine & Mobile state
   const [isVoiceEnabled, setIsVoiceEnabled] = useState(true);
   const [isVoiceMuted, setIsVoiceMuted] = useState(false);
@@ -312,8 +327,8 @@ export default function FounderDashboardPage() {
     }
   };
 
-  // Fallback client-side speech synthesis
-  const fallbackSynthesis = useCallback((cleanText: string) => {
+// Fallback client-side speech synthesis with strict generation lock
+  const fallbackSynthesis = useCallback((cleanText: string, targetGenId: number) => {
     if (typeof window === 'undefined' || !window.speechSynthesis) {
       setIsSpeaking(false);
       return;
@@ -331,9 +346,24 @@ export default function FounderDashboardPage() {
       if (jarvisVoice) utterance.voice = jarvisVoice;
       utterance.rate = 1.0;
       utterance.pitch = 0.95;
-      utterance.onstart = () => setIsSpeaking(true);
-      utterance.onend = () => setIsSpeaking(false);
-      utterance.onerror = () => setIsSpeaking(false);
+      utterance.onstart = () => {
+        if (speechGenIdRef.current === targetGenId) {
+          setIsSpeaking(true);
+        }
+      };
+      utterance.onend = () => {
+        if (speechGenIdRef.current === targetGenId) {
+          setIsSpeaking(false);
+          if (isContinuousModeRef.current) {
+            triggerAutoListenRef.current();
+          }
+        }
+      };
+      utterance.onerror = () => {
+        if (speechGenIdRef.current === targetGenId) {
+          setIsSpeaking(false);
+        }
+      };
       window.speechSynthesis.resume();
       window.speechSynthesis.speak(utterance);
     } catch (_) {
@@ -341,15 +371,26 @@ export default function FounderDashboardPage() {
     }
   }, []);
 
-  // Instantly cut off all audio and voice synthesis (Instant Interrupt)
+  // Instantly cut off all audio and voice synthesis (Instant 10ms Interrupt)
   const stopAllVoicePlayback = useCallback(() => {
+    speechGenIdRef.current++; // Invalidate any ongoing speech promises
     if (typeof window !== 'undefined') {
+      if (activeAudioRef.current) {
+        try {
+          activeAudioRef.current.pause();
+          activeAudioRef.current.currentTime = 0;
+          activeAudioRef.current.removeAttribute('src');
+          activeAudioRef.current.src = '';
+          activeAudioRef.current = null;
+        } catch (_) {}
+      }
       if ((window as any).__jarvisCurrentAudio) {
         try {
           (window as any).__jarvisCurrentAudio.pause();
           (window as any).__jarvisCurrentAudio.currentTime = 0;
           (window as any).__jarvisCurrentAudio.removeAttribute('src');
           (window as any).__jarvisCurrentAudio.src = '';
+          (window as any).__jarvisCurrentAudio = null;
         } catch (_) {}
       }
       if (audioPlayerRef.current) {
@@ -371,42 +412,76 @@ export default function FounderDashboardPage() {
     setIsSpeaking(false);
   }, []);
 
-  // Voice output synthesis (Jarvis speaks aloud via media player channel)
+  // Rock-Solid Single-Channel Voice Engine (Zero Echo, Zero Overlap, Locked British Character)
   const speakJarvisVoice = useCallback((textToSpeak: string) => {
     if (isVoiceMuted || !isVoiceEnabled || typeof window === 'undefined') return;
 
     // Immediately stop any lingering audio before starting new voice
     stopAllVoicePlayback();
 
-    const cleanText = textToSpeak.replace(/[^a-zA-Z0-9\s.,!?'$-]/g, ' ').slice(0, 300).trim();
+    const cleanText = textToSpeak
+      .replace(/\[[A-Z_]+\]/g, '') // strip brackets
+      .replace(/\[([^\]]+)\]\([^\)]+\)/g, '$1') // strip markdown links
+      .replace(/```[\s\S]*?```/g, '') // strip code blocks
+      .replace(/`([^`]+)`/g, '$1') // strip inline code
+      .replace(/[*#_~>]/g, ' ') // strip markdown symbols
+      .replace(/[^a-zA-Z0-9\s.,!?'$%-]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .slice(0, 320)
+      .trim();
+
     if (!cleanText) return;
 
+    const thisGenId = ++speechGenIdRef.current;
     setIsSpeaking(true);
 
     try {
-      // 1. Primary: High-fidelity MP3 Stream via Media Channel (plays even if iPhone silent switch is ON!)
-      const audio = audioPlayerRef.current || new Audio();
+      // 1. Primary: High-fidelity British MP3 Stream via Media Channel
+      const audio = new Audio(`/api/founder/tts?text=${encodeURIComponent(cleanText)}&pin=${pin || '8492'}`);
+      activeAudioRef.current = audio;
       audioPlayerRef.current = audio;
       (window as any).__jarvisCurrentAudio = audio;
-      audio.src = `/api/founder/tts?text=${encodeURIComponent(cleanText)}&pin=${pin || '8492'}`;
-      audio.onplay = () => setIsSpeaking(true);
-      audio.onended = () => {
-        setIsSpeaking(false);
-        (window as any).__jarvisCurrentAudio = null;
+
+      let playbackStarted = false;
+
+      audio.onplay = () => {
+        if (speechGenIdRef.current === thisGenId) {
+          playbackStarted = true;
+          setIsSpeaking(true);
+        } else {
+          audio.pause();
+          audio.src = '';
+        }
       };
+
+      audio.onended = () => {
+        if (speechGenIdRef.current === thisGenId) {
+          setIsSpeaking(false);
+          activeAudioRef.current = null;
+          (window as any).__jarvisCurrentAudio = null;
+          if (isContinuousModeRef.current) {
+            triggerAutoListenRef.current();
+          }
+        }
+      };
+
       audio.onerror = () => {
-        fallbackSynthesis(cleanText);
+        if (speechGenIdRef.current === thisGenId && !playbackStarted) {
+          fallbackSynthesis(cleanText, thisGenId);
+        }
       };
 
       const playPromise = audio.play();
       if (playPromise !== undefined) {
         playPromise.catch((err) => {
-          console.warn('Audio stream play prevented, trying speech synthesis fallback:', err);
-          fallbackSynthesis(cleanText);
+          if (speechGenIdRef.current === thisGenId && !playbackStarted) {
+            console.warn('Audio stream play prevented, engaging single fallback:', err);
+            fallbackSynthesis(cleanText, thisGenId);
+          }
         });
       }
     } catch (e) {
-      fallbackSynthesis(cleanText);
+      fallbackSynthesis(cleanText, thisGenId);
     }
   }, [isVoiceEnabled, isVoiceMuted, pin, fallbackSynthesis, stopAllVoicePlayback]);
 
@@ -781,6 +856,31 @@ export default function FounderDashboardPage() {
         if (data.deck) {
           setActiveDeck(data.deck);
         }
+
+        if (data.hudAction) {
+          const action = data.hudAction;
+          if (action.tab) {
+            if (action.tab === 'studio' || action.tab === 'social' || action.tab === 'analytics') {
+              setActiveNavTab(action.tab);
+            } else {
+              setActiveTab(action.tab);
+            }
+          }
+          if (action.targetId) {
+            setSpotlightTarget(action.targetId);
+            setSpotlightCaption(action.caption || 'Target Isolated');
+            setTimeout(() => {
+              const el = document.getElementById(action.targetId);
+              if (el) {
+                el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+              }
+            }, 300);
+            setTimeout(() => {
+              setSpotlightTarget((curr) => (curr === action.targetId ? null : curr));
+            }, 9000);
+          }
+        }
+
         setAiChatHistory([
           ...newHistory,
           {
@@ -822,6 +922,19 @@ export default function FounderDashboardPage() {
   useEffect(() => {
     handleSendAiPromptRef.current = handleSendAiPrompt;
   });
+
+  useEffect(() => {
+    triggerAutoListenRef.current = () => {
+      if (!isSpeaking && isContinuousModeRef.current) {
+        setTimeout(() => {
+          if (!isSpeaking && isContinuousModeRef.current) {
+            toggleMic();
+          }
+        }, 350);
+      }
+    };
+  });
+
 
   // PIN SHIELD VIEW
   if (!isAuthenticated) {
@@ -1120,7 +1233,12 @@ export default function FounderDashboardPage() {
           </div>
 
           {/* 3. Subscriptions & MRR */}
-          <div className="bg-slate-900/80 border border-slate-800 rounded-3xl p-5 shadow-lg">
+          <div id="metric-mrr" className={`bg-slate-900/80 border border-slate-800 rounded-3xl p-5 shadow-lg relative transition-all duration-500 ${spotlightTarget === 'metric-mrr' ? 'ring-4 ring-cyber-cyan shadow-[0_0_50px_rgba(0,240,255,0.8)] scale-[1.02] z-30' : ''}`}>
+            {spotlightTarget === 'metric-mrr' && (
+              <div className="absolute top-2 right-2 px-2.5 py-0.5 rounded-full bg-cyber-cyan text-black font-mono font-black text-[10px] shadow-glow-cyan flex items-center gap-1 animate-pulse">
+                <span>[ ── ⊕ ── ]</span> <span>{spotlightCaption || 'ISOLATED'}</span>
+              </div>
+            )}
             <div className="flex items-center justify-between mb-2">
               <span className="text-xs font-mono uppercase tracking-wider text-purple-400 font-bold flex items-center space-x-1.5">
                 <RefreshCw className="w-4 h-4" />
@@ -1140,7 +1258,12 @@ export default function FounderDashboardPage() {
           </div>
 
           {/* 4. Traffic & Conversion Funnel */}
-          <div className="bg-slate-900/80 border border-slate-800 rounded-3xl p-5 shadow-lg">
+          <div id="metric-active-subs" className={`bg-slate-900/80 border border-slate-800 rounded-3xl p-5 shadow-lg relative transition-all duration-500 ${spotlightTarget === 'metric-active-subs' ? 'ring-4 ring-cyber-cyan shadow-[0_0_50px_rgba(0,240,255,0.8)] scale-[1.02] z-30' : ''}`}>
+            {spotlightTarget === 'metric-active-subs' && (
+              <div className="absolute top-2 right-2 px-2.5 py-0.5 rounded-full bg-cyber-cyan text-black font-mono font-black text-[10px] shadow-glow-cyan flex items-center gap-1 animate-pulse">
+                <span>[ ── ⊕ ── ]</span> <span>{spotlightCaption || 'ISOLATED'}</span>
+              </div>
+            )}
             <div className="flex items-center justify-between mb-2">
               <span className="text-xs font-mono uppercase tracking-wider text-cyber-cyan font-bold flex items-center space-x-1.5">
                 <Users className="w-4 h-4" />
@@ -1215,6 +1338,29 @@ export default function FounderDashboardPage() {
 
               {/* Action Controls: Global Mute Switch, Fine-Tuning & Clear */}
               <div className="flex items-center space-x-2">
+                {/* Hands-Free Duplex Conversational Mode Toggle */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    triggerHaptic(15);
+                    const next = !isContinuousMode;
+                    setIsContinuousMode(next);
+                    if (next && !isListening && !isSpeaking) {
+                      toggleMic();
+                    }
+                  }}
+                  className={`px-3 py-1.5 rounded-xl border text-xs font-bold transition-all flex items-center space-x-1.5 shadow-sm active:scale-95 ${
+                    isContinuousMode
+                      ? 'bg-cyan-500/20 border-cyber-cyan text-cyan-300 shadow-[0_0_15px_rgba(0,240,255,0.4)]'
+                      : 'bg-slate-950 border-slate-700 text-slate-400 hover:text-white'
+                  }`}
+                  title="Hands-Free Continuous Voice Conversation (Speaks & Listens Automatically)"
+                >
+                  <Sparkles className={`w-3.5 h-3.5 ${isContinuousMode ? 'text-cyber-cyan animate-spin' : 'text-slate-500'}`} />
+                  <span className="hidden sm:inline">{isContinuousMode ? 'Hands-Free: ON' : 'Hands-Free: OFF'}</span>
+                  <span className="sm:hidden">{isContinuousMode ? 'Duplex ON' : 'Duplex'}</span>
+                </button>
+
                 <button
                   type="button"
                   onClick={toggleGlobalMute}
@@ -1257,6 +1403,161 @@ export default function FounderDashboardPage() {
                 >
                   <Trash2 className="w-4 h-4" />
                 </button>
+              </div>
+            </div>
+
+            {/* STARK INDUSTRIES HOLOGRAPHIC ARC REACTOR CORE */}
+            <div className="bg-slate-950/90 border border-slate-800/90 rounded-3xl p-6 sm:p-8 shadow-2xl relative overflow-hidden backdrop-blur-xl">
+              {/* Cinematic Ambient Glow */}
+              <div className={`absolute inset-0 transition-opacity duration-700 pointer-events-none ${
+                isSpeaking
+                  ? 'bg-[radial-gradient(circle_at_center,rgba(147,51,234,0.15)_0%,transparent_70%)]'
+                  : isListening
+                  ? 'bg-[radial-gradient(circle_at_center,rgba(244,63,94,0.15)_0%,transparent_70%)]'
+                  : 'bg-[radial-gradient(circle_at_center,rgba(0,240,255,0.08)_0%,transparent_70%)]'
+              }`} />
+
+              {/* Floating Holographic Spotlight Reticle Banner */}
+              {spotlightTarget && (
+                <div className="mb-4 px-4 py-2 rounded-2xl bg-cyber-cyan/15 border border-cyber-cyan/40 text-cyber-cyan flex items-center justify-between text-xs font-mono font-bold animate-pulse">
+                  <div className="flex items-center space-x-2">
+                    <span className="w-2 h-2 rounded-full bg-cyber-cyan animate-ping" />
+                    <span>[ ── ⊕ SCREEN CONTROL: {spotlightCaption || 'TARGET ISOLATED'} ── ]</span>
+                  </div>
+                  <button
+                    onClick={() => setSpotlightTarget(null)}
+                    className="px-2 py-0.5 rounded-lg bg-cyber-cyan text-black font-black text-[10px] hover:brightness-110"
+                  >
+                    DISMISS
+                  </button>
+                </div>
+              )}
+
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-6 relative z-10">
+                {/* Arc Reactor Holographic Orb */}
+                <div className="flex items-center space-x-5">
+                  <div
+                    onClick={toggleMic}
+                    className="relative w-24 h-24 sm:w-28 sm:h-28 rounded-full flex items-center justify-center cursor-pointer select-none group"
+                    title={isSpeaking ? 'Tap to Interrupt' : isListening ? 'Listening (Tap to Send)' : 'Tap to Speak'}
+                  >
+                    {/* Outer Gyroscopic Ring */}
+                    <div className={`absolute inset-0 rounded-full border border-dashed transition-all duration-700 ${
+                      isSpeaking
+                        ? 'border-purple-500 animate-[spin_6s_linear_infinite] shadow-[0_0_25px_rgba(168,85,247,0.5)]'
+                        : isListening
+                        ? 'border-rose-500 animate-[spin_3s_linear_infinite] shadow-[0_0_25px_rgba(244,63,94,0.5)]'
+                        : 'border-cyber-cyan/40 animate-[spin_16s_linear_infinite] group-hover:border-cyber-cyan'
+                    }`} />
+
+                    {/* Middle Counter-Rotating Ring */}
+                    <div className={`absolute inset-2 rounded-full border transition-all duration-700 ${
+                      isSpeaking
+                        ? 'border-cyan-400 border-t-transparent animate-[spin_4s_linear_infinite_reverse]'
+                        : isListening
+                        ? 'border-rose-400 border-b-transparent animate-[spin_2s_linear_infinite_reverse]'
+                        : 'border-slate-700 border-t-cyber-cyan/50 animate-[spin_10s_linear_infinite_reverse]'
+                    }`} />
+
+                    {/* Inner Core Energy Sphere */}
+                    <div className={`w-14 h-14 sm:w-16 sm:h-16 rounded-full flex items-center justify-center transition-all duration-300 shadow-inner ${
+                      isSpeaking
+                        ? 'bg-gradient-to-tr from-purple-600 to-indigo-500 text-white scale-110 shadow-[0_0_30px_rgba(147,51,234,0.8)]'
+                        : isListening
+                        ? 'bg-gradient-to-tr from-rose-600 to-red-500 text-white scale-110 shadow-[0_0_30px_rgba(244,63,94,0.8)]'
+                        : 'bg-gradient-to-tr from-slate-900 to-slate-800 text-cyber-cyan border border-cyber-cyan/40 group-hover:scale-105 shadow-[0_0_20px_rgba(0,240,255,0.2)]'
+                    }`}>
+                      {isSpeaking ? (
+                        <Volume2 className="w-6 h-6 animate-pulse" />
+                      ) : isListening ? (
+                        <MicOff className="w-6 h-6 animate-pulse text-white" />
+                      ) : (
+                        <Bot className="w-7 h-7 text-cyber-cyan" />
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Persona Status & Live Audio Frequency Bars */}
+                  <div className="space-y-1.5 text-center sm:text-left">
+                    <div className="flex items-center justify-center sm:justify-start space-x-2">
+                      <span className="text-base sm:text-lg font-black tracking-tight text-white">J.A.R.V.I.S. Core Engine</span>
+                      <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-cyan-500/10 border border-cyber-cyan/30 text-cyber-cyan font-bold">
+                        v2.5 Neural
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-400">
+                      {isSpeaking
+                        ? 'Synthesizing voice briefing to Dylan (Tap orb to interrupt)...'
+                        : isListening
+                        ? 'Listening to Dylan... (Speak naturally)'
+                        : isContinuousMode
+                        ? 'Hands-Free Duplex Active • Waiting for conversation'
+                        : 'Autonomous Co-Founder & Studio Copilot'}
+                    </p>
+
+                    {/* Animated EQ Frequency Bars */}
+                    <div className="flex items-center justify-center sm:justify-start space-x-1 h-4 pt-1">
+                      {[18, 45, 80, 60, 95, 30, 75, 40, 90, 55, 35, 70, 20].map((height, idx) => (
+                        <div
+                          key={idx}
+                          className={`w-1 rounded-full transition-all duration-150 ${
+                            isSpeaking
+                              ? 'bg-gradient-to-t from-indigo-500 to-purple-400 animate-pulse'
+                              : isListening
+                              ? 'bg-gradient-to-t from-red-500 to-rose-400 animate-pulse'
+                              : 'bg-slate-800'
+                          }`}
+                          style={{
+                            height: isSpeaking ? `${(height % 85) + 15}%` : isListening ? `${(height % 70) + 20}%` : '20%',
+                          }}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Real-time Enterprise Situational Awareness Badges */}
+                <div className="flex flex-wrap items-center justify-center sm:justify-end gap-2 text-[11px] font-mono">
+                  <div className="px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-800 flex items-center space-x-1.5 text-slate-300">
+                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+                    <span className="text-emerald-300 font-bold">CENTRAL: V3.0.3</span>
+                  </div>
+                  <div className="px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-800 flex items-center space-x-1.5 text-slate-300">
+                    <span className="w-2 h-2 rounded-full bg-amber-400" />
+                    <span className="text-amber-300 font-bold">AVID/PACE: IN REVIEW</span>
+                  </div>
+                  <div className="px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-800 flex items-center space-x-1.5 text-slate-300">
+                    <span className="w-2 h-2 rounded-full bg-cyber-cyan" />
+                    <span className="text-cyan-300 font-bold">RIGS: 2/5 ACTIVE</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Startup Executive Briefing HUD Banner */}
+              <div className="mt-5 pt-4 border-t border-slate-800/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-900/60 rounded-2xl p-4">
+                <div className="space-y-1">
+                  <div className="flex items-center space-x-2 text-cyber-cyan text-xs font-mono font-bold">
+                    <Sparkles className="w-3.5 h-3.5 text-cyber-cyan" />
+                    <span>EXECUTIVE BRIEFING: SYSTEMS NOMINAL</span>
+                  </div>
+                  <p className="text-xs text-slate-300">
+                    Net: <strong className="text-white">${(fin?.netTotal || 0).toFixed(2)}</strong> • 2 Active DAW Rigs • 4-Plugin Vocal Chain Ad Staged • Avid AAX Pipeline Monitored.
+                  </p>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      triggerHaptic(15);
+                      unlockAudioOnTouch();
+                      speakJarvisVoice(`Good afternoon Dylan. Systems are nominal. We have 2 active studio rigs licensed, store telemetry is live, Avid developer review is in queue for AAX, and our 4-plugin vocal chain campaign is staged. What are we building today?`);
+                    }}
+                    className="px-3.5 py-1.5 rounded-xl bg-cyber-cyan text-black font-black text-xs shadow-glow-cyan hover:brightness-110 active:scale-95 transition-all flex items-center space-x-1.5 whitespace-nowrap"
+                  >
+                    <Volume2 className="w-3.5 h-3.5" />
+                    <span>Listen to Briefing</span>
+                  </button>
+                </div>
               </div>
             </div>
 

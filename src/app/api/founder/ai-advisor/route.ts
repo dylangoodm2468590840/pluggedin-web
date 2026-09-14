@@ -140,6 +140,35 @@ CRITICAL PERSONA & COMMUNICATION RULES:
 ${customDirectives}
 ${memoryString}
 
+
+DEEP PROJECT REALITY & ENTERPRISE CONTEXT (YOU ALREADY KNOW THIS 100%):
+1. Avid & PACE / iLok: We are actively in the application pipeline with the Avid Developer Program to obtain PACE Eden digital signing tools so we can compile and sign native Pro Tools AAX plugins. You know AAX requires Eden signatures and we are navigating Avid's approval.
+2. Apple Developer ID & macOS Notarization: We know why early FL Studio/Logic plugin scans on Mac threw 'errored' (Gatekeeper quarantine flags and ad-hoc code signatures). Our macOS production deployment uses Apple Developer ID signed PKGs with AudioComponentRegistrar cache flushing.
+3. PluggedIN Central Desktop: Version 3.0.3 is live with GitHub auto-updates. It checks the user's hardware machine GUID against our Upstash Redis cloud database (enforcing a strict 5-computer rig limit per user) and writes the signed license to C:\ProgramData\PluggedIN\license.lic for offline DAW authorization.
+4. Active Accounts & Sales: Dylan's account (dylangoodm@gmail.com) has 2 active computers (DYLANNN and DYLAN-STUDIO-RIG) out of 5 allowed. PayPal subscriptions ($9.99/mo, $99/yr, $199 Lifetime VIP) are live. Dylan's secret VIP pass is DYLANVIP.
+5. Marketing & Social: Our official social handles are managed under pluggedincentral@gmail.com across YouTube Shorts, Instagram Reels, and Facebook Reels.
+6. PRE-LAUNCH & STEALTH ROLLOUT STAGE (CRITICAL):
+We have NOT publicly released or promoted the website yet. We are currently in private founder pre-launch staging. Do NOT act surprised that sales are in testing numbers or talk as if public campaigns failed. We are strategically building our launch arsenal: finalizing Avid/PACE Eden AAX signing, Apple Developer ID notarization for Mac, and producing viral TikTok/Reels video ads so when Dylan gives the green light, our public launch creates massive immediate conversion. Your mission right now is Dylan's pre-launch strategic copilot: helping him plan, test, and execute every step toward a flawless public debut.
+
+SELF-UPDATING & EVOLUTION PROTOCOL:
+When Dylan asks about updates or you discuss self-improvements:
+- You ONLY update if it makes you smarter, faster, or directly creates business revenue, and you never break production.
+- Every self-update must explain:
+  1. What was upgraded (Exact technical change).
+  2. Why it was necessary.
+  3. Direct Revenue Impact (How it increases conversion, retention, or saves engineering time).
+
+[SCREEN_ACTION]
+When Dylan asks you to show, isolate, navigate, or inspect a section of the platform (e.g. "show me sales", "how much did we make today", "show me my studio computers", "pull up social media", "check the sentinel watchdog", "show me our top plugin"), output a HUD action block:
+[SCREEN_ACTION]
+{
+  "action": "spotlight",
+  "tab": "financials" | "subs" | "plugins" | "traffic" | "customers" | "sentinel" | "social" | "studio",
+  "targetId": "metric-net-sales" | "metric-mrr" | "metric-active-subs" | "card-active-rigs" | "card-social-queue" | "card-plugin-leaderboard" | "card-sentinel-status",
+  "caption": "ISOLATING REAL-TIME NET PROFIT"
+}
+[/SCREEN_ACTION]
+
 OUTPUT FORMAT REQUIREMENTS:
 Always structure your output with these sections:
 [VOICE_SPEECH]
@@ -322,6 +351,21 @@ When Dylan asks to create, generate, script, or brainstorm an ad, video ad, TikT
               let deckData: any = null;
               let videoAdData: any = null;
               let pluginSpecData: any = null;
+let hudActionData: any = null;
+
+              if (candidateText.includes('[SCREEN_ACTION]')) {
+                const actionParts = candidateText.split('[SCREEN_ACTION]');
+                candidateText = actionParts[0].trim();
+                const rawAction = actionParts[1].split('[/SCREEN_ACTION]')[0].trim();
+                const jsonMatch = rawAction.match(/\{[\s\S]*\}/);
+                if (jsonMatch) {
+                  try {
+                    hudActionData = JSON.parse(jsonMatch[0]);
+                  } catch (e) {
+                    console.warn('Failed to parse screen action JSON:', e);
+                  }
+                }
+              }
 
               if (candidateText.includes('[PLUGIN_SPEC]')) {
                 const specParts = candidateText.split('[PLUGIN_SPEC]');
@@ -507,6 +551,45 @@ When Dylan asks to create, generate, script, or brainstorm an ad, video ad, TikT
                 }
               }
 
+              if (!hudActionData) {
+                if (lower.includes('sales') || lower.includes('financials') || lower.includes('revenue') || lower.includes('profit') || lower.includes('money') || lower.includes('make today')) {
+                  hudActionData = {
+                    action: 'spotlight',
+                    tab: 'financials',
+                    targetId: 'metric-net-sales',
+                    caption: 'Isolating Real-Time Net Revenue'
+                  };
+                } else if (lower.includes('computer') || lower.includes('rig') || lower.includes('machine') || lower.includes('daw rig') || lower.includes('activat')) {
+                  hudActionData = {
+                    action: 'spotlight',
+                    tab: 'subs',
+                    targetId: 'card-active-rigs',
+                    caption: 'Isolating Authorized DAW Rigs (2/5 Active)'
+                  };
+                } else if (lower.includes('social') || lower.includes('queue') || lower.includes('post') || lower.includes('instagram') || lower.includes('youtube') || lower.includes('tiktok queue')) {
+                  hudActionData = {
+                    action: 'spotlight',
+                    tab: 'social',
+                    targetId: 'card-social-queue',
+                    caption: 'Isolating Social Command Center Queue'
+                  };
+                } else if (lower.includes('sentinel') || lower.includes('watchdog') || lower.includes('threat') || lower.includes('error') || lower.includes('health')) {
+                  hudActionData = {
+                    action: 'spotlight',
+                    tab: 'sentinel',
+                    targetId: 'card-sentinel-status',
+                    caption: 'Isolating Sentinel 24/7 Watchdog'
+                  };
+                } else if (lower.includes('plugin') && (lower.includes('top') || lower.includes('leader') || lower.includes('best'))) {
+                  hudActionData = {
+                    action: 'spotlight',
+                    tab: 'plugins',
+                    targetId: 'card-plugin-leaderboard',
+                    caption: 'Isolating Top Performing Audio Plugins'
+                  };
+                }
+              }
+
               if (candidateText.includes('[WRITTEN_BRIEFING]')) {
                 const parts = candidateText.split('[WRITTEN_BRIEFING]');
                 speech = parts[0].replace(/\[VOICE_SPEECH\]/g, '').trim();
@@ -544,6 +627,7 @@ When Dylan asks to create, generate, script, or brainstorm an ad, video ad, TikT
                 deck: deckData,
                 videoAd: videoAdData,
                 pluginSpec: pluginSpecData,
+                hudAction: hudActionData,
                 dispatch: dispatchLogged,
                 source: `gemini-neural (${model.replace('models/', '')})`,
               });
@@ -652,6 +736,7 @@ Ready to deploy whenever you are.`;
       success: true,
       reply: advice,
       speech: cleanSpeech,
+      hudAction: null,
       dispatch: dispatchLogged,
       source: 'jarvis-cognitive-engine',
     });
