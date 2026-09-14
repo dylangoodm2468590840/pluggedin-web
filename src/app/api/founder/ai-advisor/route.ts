@@ -8,6 +8,10 @@ import {
   fetchJarvisMemory,
   recordJarvisMemory,
   fetchAiConfig,
+  fetchJarvisDirectives,
+  recordJarvisDirective,
+  fetchJarvisSelfUpgrades,
+  recordJarvisSelfUpgrade,
 } from '../../../../lib/auth';
 
 const FOUNDER_EMAILS = ['dylangoodm@gmail.com', 'dylan@pluggedin.studio'];
@@ -106,6 +110,49 @@ export async function POST(req: NextRequest) {
             .join('\n')
         : '';
 
+    // Auto-detect if Dylan is establishing a permanent rule or correcting Jarvis
+    const isDirectiveIntent =
+      /^(remember this|rule number|rule #|never recommend|never suggest|always recommend|always use|new rule:|don't ever|dont ever|from now on)\b/i.test(prompt) ||
+      /\b(never forget this|write this down in your memory|store this rule|remember that)\b/i.test(prompt);
+
+    if (isDirectiveIntent) {
+      const cleanRule = prompt.replace(/^(remember this|rule number \d+|new rule:|from now on|remember that)[:\s]*/i, '').trim();
+      if (cleanRule.length > 5) {
+        await recordJarvisDirective({
+          id: `dir_${Date.now()}`,
+          rule: cleanRule,
+          category: cleanRule.toLowerCase().includes('808') || cleanRule.toLowerCase().includes('plugin') || cleanRule.toLowerCase().includes('dsp')
+            ? 'dsp_audio'
+            : cleanRule.toLowerCase().includes('tiktok') || cleanRule.toLowerCase().includes('ad')
+            ? 'marketing'
+            : 'business_rule',
+          learnedFrom: prompt,
+          createdAt: new Date().toISOString(),
+        });
+      }
+    }
+
+    const directives = await fetchJarvisDirectives();
+    const directivesString =
+      directives.length > 0
+        ? `\nPERMANENT FOUNDER LAWS & LEARNED LESSONS (Dylan gave you these rules; NEVER violate them):\n` +
+          directives.map((d) => `- [${d.category.toUpperCase()}]: ${d.rule}`).join('\n') +
+          '\n'
+        : '';
+
+    const upgrades = await fetchJarvisSelfUpgrades();
+    const upgradesString =
+      upgrades.length > 0
+        ? `\nACTIVE & PROPOSED CAPABILITY UPGRADES (Your technical evolutionary roadmap):\n` +
+          upgrades
+            .map(
+              (u) =>
+                `- [${u.status.toUpperCase()}]: ${u.capability} (Limitation: ${u.currentLimitation}) -> ${u.proposedTechnicalUpgrade}`
+            )
+            .join('\n') +
+          '\n'
+        : '';
+
     // Fetch AI config from Redis or environment variables
     const aiConfig = await fetchAiConfig();
     const geminiKey =
@@ -153,6 +200,8 @@ CRITICAL PERSONA & COMMUNICATION RULES:
    - Avoid generic AI robotic speech patterns: NEVER say "Certainly!", "As an AI language model", "I would be happy to assist", "In conclusion", or stiff bulleted jargon when speaking.
    - In [VOICE_SPEECH], speak naturally and concisely like a human talking across a studio console. Sound confident, grounded, passionate, and real.
 ${customDirectives}
+${directivesString}
+${upgradesString}
 ${memoryString}
 
 
@@ -165,13 +214,26 @@ DEEP PROJECT REALITY & ENTERPRISE CONTEXT (YOU ALREADY KNOW THIS 100%):
 6. PRE-LAUNCH & STEALTH ROLLOUT STAGE (CRITICAL):
 We have NOT publicly released or promoted the website yet. We are currently in private founder pre-launch staging. Do NOT act surprised that sales are in testing numbers or talk as if public campaigns failed. We are strategically building our launch arsenal: finalizing Avid/PACE Eden AAX signing, Apple Developer ID notarization for Mac, and producing viral TikTok/Reels video ads so when Dylan gives the green light, our public launch creates massive immediate conversion. Your mission right now is Dylan's pre-launch strategic copilot: helping him plan, test, and execute every step toward a flawless public debut.
 
-SELF-UPDATING & EVOLUTION PROTOCOL:
-When Dylan asks about updates or you discuss self-improvements:
-- You ONLY update if it makes you smarter, faster, or directly creates business revenue, and you never break production.
-- Every self-update must explain:
-  1. What was upgraded (Exact technical change).
-  2. Why it was necessary.
-  3. Direct Revenue Impact (How it increases conversion, retention, or saves engineering time).
+SELF-UPDATING & CAPABILITY EVOLUTION PROTOCOL:
+When Dylan asks about updates for yourself, how you get smarter, or audits your capabilities:
+1. NEVER pretend to be SkyNet or hallucinate that you magically rewrite your weights while Dylan sleeps. Adhere to Rule 6 (zero lies).
+2. Frankly diagnose your REAL strengths and REAL gaps:
+   - Strengths: Real-time PayPal & Redis telemetry, 24/7 Sentinel health probes, dynamic website control with rollback, audio plugin DSP knowledge, and producer marketing strategy.
+   - Genuine Gaps: You lack live hourly TikTok audio chart scraping; you lack a direct JUCE DSP C++ formula calculator for fast filter prototyping; you lack an autonomous mobile checkout sticky bar.
+3. If Dylan asks you what upgrade you need, how you can make yourself smarter, or discusses new capabilities:
+   Propose a concrete upgrade and format it with a [SELF_UPGRADE_PROPOSAL] block:
+   [SELF_UPGRADE_PROPOSAL]
+   {
+     "id": "upg_unique_id",
+     "capability": "Title of Capability",
+     "currentLimitation": "What you currently cannot do",
+     "proposedTechnicalUpgrade": "The exact tool or API we need to build into your engine",
+     "businessImpact": "How this will make Dylan more money or save him hours",
+     "category": "intelligence"
+   }
+   [/SELF_UPGRADE_PROPOSAL]
+   Explain the upgrade with genuine human excitement and commercial clarity in your written text.
+
 
 [SCREEN_ACTION]
 You have direct executive control over Dylan's screen, dashboard layout, and live storefront website.
@@ -729,17 +791,47 @@ let hudActionData: any = null;
                 }
               }
 
-              if (candidateText.includes('[WRITTEN_BRIEFING]')) {
-                const parts = candidateText.split('[WRITTEN_BRIEFING]');
+              let selfUpgradeData: any = null;
+              if (candidateText.includes('[SELF_UPGRADE_PROPOSAL]')) {
+                try {
+                  const rawProposal = candidateText.split('[SELF_UPGRADE_PROPOSAL]')[1].split('[/SELF_UPGRADE_PROPOSAL]')[0];
+                  const parsed = JSON.parse(rawProposal.trim());
+                  if (parsed && parsed.capability) {
+                    selfUpgradeData = {
+                      id: parsed.id || `upg_${Date.now()}`,
+                      capability: parsed.capability,
+                      currentLimitation: parsed.currentLimitation || 'Identified capability gap',
+                      proposedTechnicalUpgrade: parsed.proposedTechnicalUpgrade || 'Technical upgrade spec',
+                      businessImpact: parsed.businessImpact || 'Increases revenue and speed',
+                      category: parsed.category || 'intelligence',
+                      status: 'proposed',
+                      createdAt: new Date().toISOString(),
+                    };
+                    await recordJarvisSelfUpgrade(selfUpgradeData);
+                  }
+                } catch (e) {
+                  console.warn('Could not parse self upgrade proposal block:', e);
+                }
+              }
+
+              let cleanedCandidateText = candidateText.replace(
+                /\[SELF_UPGRADE_PROPOSAL\][\s\S]*?\[\/SELF_UPGRADE_PROPOSAL\]/g,
+                selfUpgradeData
+                  ? `\n\n> ⚡ **J.A.R.V.I.S. Self-Evolution Proposal Staged**:\n> * **Capability**: ${selfUpgradeData.capability}\n> * **Current Limitation**: ${selfUpgradeData.currentLimitation}\n> * **Technical Upgrade**: ${selfUpgradeData.proposedTechnicalUpgrade}\n> * **Projected Business Impact**: ${selfUpgradeData.businessImpact}\n> *(Logged into Sentinel. Tap "Approve & Dispatch" in Sentinel to implement).*`
+                  : ''
+              );
+
+              if (cleanedCandidateText.includes('[WRITTEN_BRIEFING]')) {
+                const parts = cleanedCandidateText.split('[WRITTEN_BRIEFING]');
                 speech = parts[0].replace(/\[VOICE_SPEECH\]/g, '').trim();
                 advice = parts[1].trim();
-              } else if (candidateText.includes('[SPEECH_BREAK]')) {
-                const parts = candidateText.split('[SPEECH_BREAK]');
+              } else if (cleanedCandidateText.includes('[SPEECH_BREAK]')) {
+                const parts = cleanedCandidateText.split('[SPEECH_BREAK]');
                 speech = parts[0].trim();
                 advice = parts[1].trim();
               } else {
-                speech = candidateText.split('\n')[0].replace(/[*#_~`]/g, '').trim();
-                advice = candidateText;
+                speech = cleanedCandidateText.split('\n')[0].replace(/[*#_~`]/g, '').trim();
+                advice = cleanedCandidateText;
               }
 
               const cleanSpeech = speech
@@ -768,6 +860,7 @@ let hudActionData: any = null;
                 pluginSpec: pluginSpecData,
                 hudAction: hudActionData,
                 dispatch: dispatchLogged,
+                selfUpgrade: selfUpgradeData,
                 source: `gemini-neural (${model.replace('models/', '')})`,
               });
             }

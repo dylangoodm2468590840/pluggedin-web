@@ -1031,6 +1031,188 @@ export async function saveAiConfig(config: {
   return fullConfig;
 }
 
+// ==========================================
+// J.A.R.V.I.S. OVERNIGHT INTELLIGENCE & MORNING BRIEFING
+// ==========================================
+
+export interface JarvisMorningBriefing {
+  date: string;
+  generatedAt: string;
+  spokenBriefing: string;
+  overnightMetrics: {
+    visitors: number;
+    checkoutAttempts: number;
+    completedSales: number;
+    sentinelStatus: 'OPERATIONAL' | 'DEGRADED';
+  };
+  systemHealthSummary: string;
+  todayPriorities: string[];
+  pendingSelfUpgradesCount: number;
+}
+
+export async function fetchLatestMorningBriefing(): Promise<JarvisMorningBriefing | null> {
+  const redis = getRedis();
+  if (redis) {
+    try {
+      const data = await redis.get('pluggedin_jarvis_morning_briefing');
+      if (typeof data === 'string') {
+        try {
+          return JSON.parse(data);
+        } catch {}
+      }
+      if (data && typeof data === 'object') return data as JarvisMorningBriefing;
+    } catch (e) {
+      console.warn('Error fetching morning briefing from Upstash:', e);
+    }
+  }
+  return null;
+}
+
+export async function recordMorningBriefing(briefing: JarvisMorningBriefing): Promise<void> {
+  const redis = getRedis();
+  if (redis) {
+    try {
+      await redis.set('pluggedin_jarvis_morning_briefing', briefing);
+    } catch (e) {
+      console.warn('Error saving morning briefing to Upstash:', e);
+    }
+  }
+}
+
+// ==========================================
+// J.A.R.V.I.S. SELF-EVOLUTION & CAPABILITY UPGRADES
+// ==========================================
+
+export interface JarvisSelfUpgradeProposal {
+  id: string;
+  capability: string;
+  currentLimitation: string;
+  proposedTechnicalUpgrade: string;
+  businessImpact: string;
+  category: 'intelligence' | 'data_stream' | 'speed' | 'tool';
+  status: 'proposed' | 'approved' | 'implemented';
+  createdAt: string;
+}
+
+export async function fetchJarvisSelfUpgrades(): Promise<JarvisSelfUpgradeProposal[]> {
+  const redis = getRedis();
+  if (redis) {
+    try {
+      const data = await redis.get('pluggedin_jarvis_self_upgrades');
+      if (Array.isArray(data)) return data;
+      if (typeof data === 'string') {
+        try {
+          return JSON.parse(data);
+        } catch {}
+      }
+    } catch (e) {
+      console.warn('Error fetching self upgrades from Upstash:', e);
+    }
+  }
+  return [];
+}
+
+export async function recordJarvisSelfUpgrade(upgrade: JarvisSelfUpgradeProposal): Promise<void> {
+  const redis = getRedis();
+  const upgrades = await fetchJarvisSelfUpgrades();
+  const existingIdx = upgrades.findIndex((u) => u.id === upgrade.id || u.capability === upgrade.capability);
+  if (existingIdx >= 0) {
+    upgrades[existingIdx] = upgrade;
+  } else {
+    upgrades.unshift(upgrade);
+  }
+  if (redis) {
+    try {
+      await redis.set('pluggedin_jarvis_self_upgrades', upgrades.slice(0, 50));
+    } catch (e) {
+      console.warn('Error saving self upgrade to Upstash:', e);
+    }
+  }
+}
+
+export async function updateJarvisSelfUpgradeStatus(
+  id: string,
+  status: 'proposed' | 'approved' | 'implemented'
+): Promise<void> {
+  const redis = getRedis();
+  const upgrades = await fetchJarvisSelfUpgrades();
+  const target = upgrades.find((u) => u.id === id);
+  if (target) {
+    target.status = status;
+    if (redis) {
+      try {
+        await redis.set('pluggedin_jarvis_self_upgrades', upgrades);
+      } catch (e) {
+        console.warn('Error updating self upgrade status in Upstash:', e);
+      }
+    }
+  }
+}
+
+// ==========================================
+// J.A.R.V.I.S. LEARNED DIRECTIVES & FOUNDER LAWS
+// ==========================================
+
+export interface JarvisLearnedDirective {
+  id: string;
+  category: 'marketing' | 'dsp_audio' | 'business_rule' | 'personality' | 'technical';
+  rule: string;
+  learnedFrom: string;
+  createdAt: string;
+}
+
+export async function fetchJarvisDirectives(): Promise<JarvisLearnedDirective[]> {
+  const redis = getRedis();
+  if (redis) {
+    try {
+      const data = await redis.get('pluggedin_jarvis_learned_directives');
+      if (Array.isArray(data)) return data;
+      if (typeof data === 'string') {
+        try {
+          return JSON.parse(data);
+        } catch {}
+      }
+    } catch (e) {
+      console.warn('Error fetching learned directives from Upstash:', e);
+    }
+  }
+  return [];
+}
+
+export async function recordJarvisDirective(directive: JarvisLearnedDirective): Promise<void> {
+  const redis = getRedis();
+  const directives = await fetchJarvisDirectives();
+  const existingIdx = directives.findIndex(
+    (d) => d.rule.toLowerCase().trim() === directive.rule.toLowerCase().trim()
+  );
+  if (existingIdx >= 0) {
+    directives[existingIdx] = directive;
+  } else {
+    directives.unshift(directive);
+  }
+  if (redis) {
+    try {
+      await redis.set('pluggedin_jarvis_learned_directives', directives.slice(0, 50));
+    } catch (e) {
+      console.warn('Error saving learned directive to Upstash:', e);
+    }
+  }
+}
+
+export async function deleteJarvisDirective(id: string): Promise<void> {
+  const redis = getRedis();
+  const directives = await fetchJarvisDirectives();
+  const filtered = directives.filter((d) => d.id !== id);
+  if (redis) {
+    try {
+      await redis.set('pluggedin_jarvis_learned_directives', filtered);
+    } catch (e) {
+      console.warn('Error deleting learned directive from Upstash:', e);
+    }
+  }
+}
+
+
 
 
 

@@ -45,6 +45,8 @@ import {
   Video,
   RotateCcw,
   Globe,
+  Sun,
+  Brain,
 } from 'lucide-react';
 import JarvisPresentationCanvas, { JarvisPresentationDeck } from '@/components/JarvisPresentationCanvas';
 import JarvisVideoAdStudio, { JarvisVideoAd } from '@/components/JarvisVideoAdStudio';
@@ -281,6 +283,73 @@ export default function FounderDashboardPage() {
   const [activeDeck, setActiveDeck] = useState<JarvisPresentationDeck | null>(null);
   const [sentinelData, setSentinelData] = useState<any>(null);
   const [dispatches, setDispatches] = useState<JarvisDispatchItem[]>([]);
+  const [morningBriefing, setMorningBriefing] = useState<any>(null);
+  const [selfUpgrades, setSelfUpgrades] = useState<any[]>([]);
+  const [learnedDirectives, setLearnedDirectives] = useState<any[]>([]);
+  const [isRefreshingOvernight, setIsRefreshingOvernight] = useState(false);
+
+  const fetchOvernightIntelligence = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/founder/sentinel/overnight?pin=${pin || '8492'}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.briefing) setMorningBriefing(data.briefing);
+        if (Array.isArray(data.upgrades)) setSelfUpgrades(data.upgrades);
+        if (Array.isArray(data.directives)) setLearnedDirectives(data.directives);
+      }
+    } catch (_) {}
+  }, [pin]);
+
+  const handleApproveUpgrade = async (upgradeId: string) => {
+    triggerHaptic(20);
+    try {
+      const res = await fetch('/api/founder/sentinel/overnight', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-founder-pin': pin || '8492' },
+        body: JSON.stringify({ action: 'approve_upgrade', upgradeId }),
+      });
+      if (res.ok) {
+        setActionMessage('✓ Upgrade approved & dispatched to engineering queue!');
+        setTimeout(() => setActionMessage(null), 5000);
+        fetchOvernightIntelligence();
+      }
+    } catch (_) {}
+  };
+
+  const handleDeleteDirective = async (directiveId: string) => {
+    triggerHaptic(15);
+    try {
+      await fetch('/api/founder/sentinel/overnight', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-founder-pin': pin || '8492' },
+        body: JSON.stringify({ action: 'delete_directive', directiveId }),
+      });
+      fetchOvernightIntelligence();
+    } catch (_) {}
+  };
+
+  const handleRunOvernightAudit = async () => {
+    triggerHaptic(20);
+    setIsRefreshingOvernight(true);
+    try {
+      const res = await fetch('/api/founder/sentinel/overnight', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-founder-pin': pin || '8492' },
+        body: JSON.stringify({ action: 'trigger_overnight_audit' }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.briefing) {
+          setMorningBriefing(data.briefing);
+          speakJarvisVoice(data.briefing.spokenBriefing);
+        }
+        setActionMessage('✓ Overnight Sentinel Audit Refreshed!');
+        setTimeout(() => setActionMessage(null), 4000);
+      }
+    } catch (_) {}
+    setIsRefreshingOvernight(false);
+  };
+
   const [aiConfig, setAiConfig] = useState<{
     provider: string;
     apiKey: string;
@@ -736,14 +805,29 @@ export default function FounderDashboardPage() {
   }, [isVoiceEnabled, isVoiceMuted, pin, playWebAudioStream, fallbackSynthesis, stopAllVoicePlayback]);
 
   // Startup Executive Briefing: Speaks live status aloud through phone/desktop speaker
-  const playStartupBriefing = useCallback(() => {
+  const playStartupBriefing = useCallback(async () => {
     if (hasPlayedStartupBriefing) return;
     setHasPlayedStartupBriefing(true);
     unlockAudioOnTouch();
-    const briefing = "Good afternoon Dylan. Systems are nominal. We are in stealth pre-launch staging with 2 active studio rigs running, store telemetry is live, Avid developer review is in queue for AAX, and our 4-plugin vocal chain campaign is staged. What are we building today?";
+
+    let briefing = "Good afternoon Dylan. Systems are nominal. We are in stealth pre-launch staging with 2 active studio rigs running, store telemetry is live, Avid developer review is in queue for AAX, and our 4-plugin vocal chain campaign is staged. What are we building today?";
+
+    try {
+      const res = await fetch(`/api/founder/sentinel/overnight?pin=${pin || '8492'}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.briefing?.spokenBriefing) {
+          briefing = data.briefing.spokenBriefing;
+          setMorningBriefing(data.briefing);
+        }
+        if (Array.isArray(data.upgrades)) setSelfUpgrades(data.upgrades);
+        if (Array.isArray(data.directives)) setLearnedDirectives(data.directives);
+      }
+    } catch (_) {}
+
     setLatestSpeech(briefing);
     speakJarvisVoice(briefing);
-  }, [hasPlayedStartupBriefing, unlockAudioOnTouch, speakJarvisVoice]);
+  }, [hasPlayedStartupBriefing, unlockAudioOnTouch, speakJarvisVoice, pin]);
 
   // First user interaction auto-briefing trigger (for already-authenticated sessions on mobile & desktop)
   useEffect(() => {
@@ -927,12 +1011,14 @@ export default function FounderDashboardPage() {
           }
         })
         .catch(() => {});
+
+      fetchOvernightIntelligence();
     } catch (err: any) {
       setAuthError('Connection error. Could not load founder telemetry.');
     } finally {
       setLoading(false);
     }
-  }, [timeframe, pin]);
+  }, [timeframe, pin, fetchOvernightIntelligence]);
 
   const handleSaveAiConfig = async () => {
     if (!tempApiKey.trim()) return;
@@ -2396,6 +2482,219 @@ export default function FounderDashboardPage() {
                   </div>
                 ))}
               </div>
+            </div>
+
+            {/* OVERNIGHT AUTONOMOUS INTELLIGENCE & MORNING BRIEFING */}
+            <div className="bg-slate-900/80 border border-slate-800 rounded-3xl p-6 space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-800">
+                <div className="flex items-center space-x-3">
+                  <div className="w-10 h-10 rounded-2xl bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center text-indigo-400">
+                    <Sun className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <div className="flex items-center space-x-2">
+                      <h3 className="text-sm font-black text-white">Overnight Autonomous Sentinel Briefing</h3>
+                      <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 font-bold">
+                        {morningBriefing?.date || 'TODAY'}
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-400">
+                      Autonomous audit of overnight visits, checkout activity, and system nodes
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center space-x-2">
+                  <button
+                    type="button"
+                    disabled={isRefreshingOvernight}
+                    onClick={handleRunOvernightAudit}
+                    className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-mono font-bold active:scale-95 transition-all flex items-center space-x-1.5"
+                  >
+                    <RefreshCw className={`w-3.5 h-3.5 ${isRefreshingOvernight ? 'animate-spin' : ''}`} />
+                    <span>Re-run Overnight Audit</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (morningBriefing?.spokenBriefing) {
+                        speakJarvisVoice(morningBriefing.spokenBriefing);
+                      } else {
+                        speakJarvisVoice("All systems held up solid overnight Dylan. Store telemetry is operational.");
+                      }
+                    }}
+                    className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-indigo-500 to-cyan-500 text-black font-black text-xs shadow-glow-cyan hover:brightness-110 active:scale-95 transition-all flex items-center space-x-1.5"
+                  >
+                    <Volume2 className="w-3.5 h-3.5" />
+                    <span>Hear Briefing</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Overnight Spoken Narrative */}
+              {morningBriefing?.spokenBriefing && (
+                <div className="p-4 rounded-2xl bg-indigo-950/40 border border-indigo-500/30 text-xs text-slate-200 leading-relaxed font-sans flex items-start space-x-3">
+                  <Bot className="w-5 h-5 text-cyan-400 shrink-0 mt-0.5" />
+                  <div>
+                    <span className="font-mono text-[10px] text-cyan-400 uppercase tracking-wider block font-bold mb-1">J.A.R.V.I.S. Morning Co-Founder Debrief:</span>
+                    <p className="italic">&ldquo;{morningBriefing.spokenBriefing}&rdquo;</p>
+                  </div>
+                </div>
+              )}
+
+              {/* Today's Top 3 Execution Priorities */}
+              {morningBriefing?.todayPriorities && morningBriefing.todayPriorities.length > 0 && (
+                <div className="space-y-2 pt-2">
+                  <span className="text-[11px] font-mono text-slate-400 uppercase tracking-wider font-bold block">
+                    Today's High-Leverage Strategic Directives:
+                  </span>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                    {morningBriefing.todayPriorities.map((p: string, idx: number) => (
+                      <div key={idx} className="p-3 rounded-xl bg-slate-950/70 border border-slate-800 text-xs text-slate-300 flex items-start space-x-2">
+                        <span className="font-mono text-cyan-400 font-bold">0{idx + 1}.</span>
+                        <span>{p}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* J.A.R.V.I.S. SELF-EVOLUTION & CAPABILITY ROADMAP */}
+            <div className="bg-slate-900/80 border border-slate-800 rounded-3xl p-6 space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-800">
+                <div className="flex items-center space-x-3">
+                  <div className="w-10 h-10 rounded-2xl bg-purple-500/20 border border-purple-500/30 flex items-center justify-center text-purple-400 shadow-glow-purple">
+                    <Sparkles className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <div className="flex items-center space-x-2">
+                      <h3 className="text-sm font-black text-white">J.A.R.V.I.S. Self-Evolution & Upgrades</h3>
+                      <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/30 font-bold">
+                        {selfUpgrades.filter((u) => u.status === 'proposed').length} PROPOSALS
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-400">
+                      Autonomous diagnosis of missing tools, data gaps, and capabilities to increase revenue
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => handleSendAiPrompt("Jarvis, audit your own capabilities. What tools, APIs, or upgrades do you need to become 10x smarter for our business?")}
+                  className="px-3.5 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs shadow-glow-purple active:scale-95 transition-all flex items-center space-x-1.5"
+                >
+                  <Bot className="w-3.5 h-3.5" />
+                  <span>Request Capability Audit</span>
+                </button>
+              </div>
+
+              {/* Proposals List */}
+              <div className="space-y-3">
+                {selfUpgrades.map((u) => (
+                  <div
+                    key={u.id}
+                    className={`p-4 rounded-2xl border transition-all flex flex-col md:flex-row md:items-center justify-between gap-3 ${
+                      u.status === 'approved'
+                        ? 'bg-purple-950/30 border-purple-500/40 text-purple-200'
+                        : 'bg-slate-950/80 border-slate-800/80 text-slate-200'
+                    }`}
+                  >
+                    <div className="space-y-1.5">
+                      <div className="flex items-center space-x-2">
+                        <span className={`text-[10px] font-mono px-2 py-0.5 rounded-full font-bold uppercase ${
+                          u.status === 'approved' ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                        }`}>
+                          {u.status === 'approved' ? '✓ Approved for Code Deploy' : 'Upgrade Proposal'}
+                        </span>
+                        <span className="text-sm font-bold text-white">{u.capability}</span>
+                      </div>
+                      <p className="text-xs text-slate-400">
+                        <strong className="text-slate-300">Limitation:</strong> {u.currentLimitation}
+                      </p>
+                      <p className="text-xs text-slate-300 font-mono">
+                        <strong className="text-cyan-400">Technical Upgrade:</strong> {u.proposedTechnicalUpgrade}
+                      </p>
+                      <p className="text-xs text-emerald-400 font-medium">
+                        💰 Projected Business Impact: {u.businessImpact}
+                      </p>
+                    </div>
+
+                    <div className="self-end md:self-auto shrink-0">
+                      {u.status === 'proposed' ? (
+                        <button
+                          onClick={() => handleApproveUpgrade(u.id)}
+                          className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:brightness-110 text-white font-black text-xs shadow-md active:scale-95 transition-all flex items-center space-x-1.5"
+                        >
+                          <span>Approve & Dispatch to Antigravity</span>
+                          <ArrowUpRight className="w-3.5 h-3.5" />
+                        </button>
+                      ) : (
+                        <span className="text-xs font-mono text-emerald-400 font-bold">
+                          ✓ Staged in Engineering Queue
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* LEARNED FOUNDER DIRECTIVES & PERMANENT MEMORY */}
+            <div className="bg-slate-900/80 border border-slate-800 rounded-3xl p-6 space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-800">
+                <div className="flex items-center space-x-3">
+                  <div className="w-10 h-10 rounded-2xl bg-cyan-500/20 border border-cyan-500/30 flex items-center justify-center text-cyan-400">
+                    <Brain className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <div className="flex items-center space-x-2">
+                      <h3 className="text-sm font-black text-white">Learned Founder Laws & Directives</h3>
+                      <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 font-bold">
+                        {learnedDirectives.length} LEARNED
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-400">
+                      Rules, audio wisdom, and marketing laws J.A.R.V.I.S. has permanently learned from your feedback
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {learnedDirectives.length > 0 ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {learnedDirectives.map((d) => (
+                    <div
+                      key={d.id}
+                      className="p-3.5 rounded-2xl bg-slate-950/70 border border-slate-800/80 flex items-start justify-between gap-2"
+                    >
+                      <div className="space-y-1">
+                        <div className="flex items-center space-x-1.5">
+                          <span className="text-[9px] font-mono uppercase font-bold px-2 py-0.5 rounded bg-cyan-500/10 text-cyan-300 border border-cyan-500/20">
+                            {d.category}
+                          </span>
+                          <span className="text-[10px] font-mono text-slate-500">
+                            Learned from: &ldquo;{d.learnedFrom?.slice(0, 30)}...&rdquo;
+                          </span>
+                        </div>
+                        <p className="text-xs text-white font-medium">&ldquo;{d.rule}&rdquo;</p>
+                      </div>
+                      <button
+                        onClick={() => handleDeleteDirective(d.id)}
+                        className="p-1.5 rounded-lg text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 transition-colors shrink-0"
+                        title="Delete directive"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="p-4 rounded-2xl bg-slate-950/40 border border-slate-800 text-xs text-slate-400 font-mono">
+                  No custom directives stored yet. Speak commands like <em>&ldquo;Jarvis, rule number one: always recommend UNDERGRND for 808s&rdquo;</em> to permanently teach him.
+                </div>
+              )}
             </div>
           </div>
         )}
