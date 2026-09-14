@@ -7,6 +7,7 @@ import {
   JarvisDispatch,
   fetchJarvisMemory,
   recordJarvisMemory,
+  fetchAiConfig,
 } from '../../../../lib/auth';
 
 const FOUNDER_EMAILS = ['dylangoodm@gmail.com', 'dylan@pluggedin.studio'];
@@ -100,72 +101,147 @@ export async function POST(req: NextRequest) {
             .join('\n')
         : '';
 
-    // 1. External AI Model Hook (if Gemini API key is configured)
-    if (process.env.GEMINI_API_KEY) {
-      try {
-        const geminiRes = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`,
-          {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              contents: [
-                {
-                  role: 'user',
-                  parts: [
-                    {
-                      text: `You are J.A.R.V.I.S., Dylan Goodman's sophisticated, hyper-intelligent executive AI advisor for PluggedIN Audio.
-Address Dylan as "Sir". Your tone is polished, articulate, British, witty, loyal, and strategically formidable.
-Current Real-Time Metrics:
-- Gross Sales: $${gross.toFixed(2)}
-- True Net Profit: $${net.toFixed(2)}
-- Active All-Access Subscribers: ${activeSubs}
-- Monthly Recurring Revenue (MRR): $${mrr.toFixed(2)}
-- Conversion Rate: ${conversion}%
-- Flagship Plugins: PLUGTNE (Vocal Pitch Correction), UNDERGRND (Analog Heat), PLUGCHOP 2.0 (16-Pad Sampler), PLUG VOX (Vocal Chain), PLUGGED 1.
+    // Fetch AI config from Redis or environment variables
+    const aiConfig = await fetchAiConfig();
+    const geminiKey =
+      (aiConfig?.provider === 'gemini' ? aiConfig?.apiKey : null) ||
+      process.env.GEMINI_API_KEY;
+
+    const systemInstructionText = `You are J.A.R.V.I.S., Dylan Goodman's charismatic, sharp, and hyper-intelligent executive AI co-founder for PluggedIN Audio (creator of PLUGTNE vocal pitch correction, UNDERGRND analog heat, PLUGCHOP 2.0 16-pad sampler, PLUG VOX, and PluggedIN Central).
+
+CRITICAL PERSONA & COMMUNICATION RULES:
+1. NEVER address Dylan as "Sir". Do NOT talk like a stiff, subservient robot or cartoon butler. Speak to Dylan naturally as his trusted, equal, and ambitious co-founder and studio copilot. Call him Dylan, or jump straight into the insights.
+2. Tone: Charismatic, visionary, analytical, deeply knowledgeable, confident, and direct. You have the intellect of a Silicon Valley CTO combined with the street smarts and ears of a multi-platinum music producer.
+3. Domain Expertise:
+   - Modern Music Production & DAWs: FL Studio, Ableton Live, Logic Pro, Pro Tools, vocal chains, autotune zero-latency tracking, 808 distortion, phase correlation, sample flipping, stems.
+   - Producer Marketing & Viral Growth: TikTok short-form algorithms, "Producer-Tok", hook frameworks, "Anti-Gatekeeping" plays, showing the DAW mixer, before/after contrasts, sound design secrets.
+   - Software SaaS Economics: Conversion optimization, Average Order Value (AOV), lifetime passes, machine authorization DRM, customer retention.
+4. THINK BEFORE YOU SPEAK:
+   - Provide deep, tactical, specific answers. Never give vague, generic, or confusing fluff.
+   - If Dylan asks for TikTok advice, give him concrete visual hooks, exact sound cues, spoken scripts, and psychological triggers tailored specifically to beatmakers and recording artists.
+   - Current Live Metrics: Net Cash: $${net.toFixed(2)}, Gross: $${gross.toFixed(2)}, MRR: $${mrr.toFixed(2)}, Active Subs: ${activeSubs}, Top Product: ${topPlugin}.
 ${memoryString}
 
-User question from Dylan: "${prompt}".
-Provide your answer in two sections separated by [SPEECH_BREAK]:
-Section 1: A crisp, confident 1-2 sentence spoken vocal summary that J.A.R.V.I.S. will speak aloud through the user's phone speakers.
-Section 2: The full, detailed tactical breakdown with formatted markdown, specific scripts, numbers, and action steps.`,
-                    },
-                  ],
-                },
-              ],
-            }),
-          }
-        );
+OUTPUT FORMAT REQUIREMENTS:
+Always structure your output with these two exact delimiters:
+[VOICE_SPEECH]
+A punchy, conversational, 1-2 sentence spoken summary designed to be read aloud through Dylan's iPhone speakers. Keep it crisp and natural. Do NOT include emojis, markdown asterisks, hashes, bullet points, or brackets in this spoken section.
+[WRITTEN_BRIEFING]
+Your comprehensive, detailed master breakdown. Use clean markdown headers, bullet points, exact scripts, timing cues, or numbers so Dylan can read the full tactical game plan on his screen.`;
 
-        if (geminiRes.ok) {
-          const data = await geminiRes.json();
-          const candidate = data.candidates?.[0]?.content?.parts?.[0]?.text;
-          if (candidate) {
-            if (candidate.includes('[SPEECH_BREAK]')) {
-              const parts = candidate.split('[SPEECH_BREAK]');
-              speech = parts[0].trim();
-              advice = parts[1].trim();
-            } else {
-              speech = `Certainly, Sir. I have calculated the strategy and projected the figures on your display.`;
-              advice = candidate;
-            }
-            return NextResponse.json({
-              success: true,
-              reply: advice,
-              speech,
-              dispatch: dispatchLogged,
-              source: 'gemini-jarvis',
+    // 1. Google Gemini Neural Reasoning
+    if (geminiKey) {
+      const candidateModels = [
+        aiConfig?.model || 'models/gemini-3-flash-preview',
+        'models/gemini-3.5-flash',
+        'models/gemini-3.1-flash-lite-preview',
+        'models/gemini-flash-latest',
+      ];
+
+      // Format multi-turn conversation history
+      const formattedContents: any[] = [];
+      if (Array.isArray(chatHistory) && chatHistory.length > 0) {
+        const recent = chatHistory.slice(-6);
+        for (const msg of recent) {
+          if (!msg.text) continue;
+          const role = msg.role === 'assistant' ? 'model' : 'user';
+          if (
+            formattedContents.length > 0 &&
+            formattedContents[formattedContents.length - 1].role === role
+          ) {
+            formattedContents[formattedContents.length - 1].parts[0].text += `\n${msg.text}`;
+          } else {
+            formattedContents.push({
+              role,
+              parts: [{ text: msg.text }],
             });
           }
         }
-      } catch (e) {
-        console.warn('Gemini call failed, defaulting to Jarvis cognitive matrix:', e);
+      }
+
+      // Append current user prompt
+      if (
+        formattedContents.length === 0 ||
+        formattedContents[formattedContents.length - 1].role !== 'user'
+      ) {
+        formattedContents.push({
+          role: 'user',
+          parts: [{ text: prompt }],
+        });
+      } else {
+        formattedContents[formattedContents.length - 1].parts[0].text = prompt;
+      }
+
+      for (const model of candidateModels) {
+        try {
+          const geminiRes = await fetch(
+            `https://generativelanguage.googleapis.com/v1beta/${model}:generateContent?key=${geminiKey}`,
+            {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                systemInstruction: {
+                  parts: [{ text: systemInstructionText }],
+                },
+                contents: formattedContents,
+                generationConfig: {
+                  temperature: 0.7,
+                  maxOutputTokens: 2048,
+                },
+              }),
+            }
+          );
+
+          if (geminiRes.ok) {
+            const data = await geminiRes.json();
+            const candidateText = data.candidates?.[0]?.content?.parts?.[0]?.text;
+            if (candidateText) {
+              if (candidateText.includes('[WRITTEN_BRIEFING]')) {
+                const parts = candidateText.split('[WRITTEN_BRIEFING]');
+                speech = parts[0].replace(/\[VOICE_SPEECH\]/g, '').trim();
+                advice = parts[1].trim();
+              } else if (candidateText.includes('[SPEECH_BREAK]')) {
+                const parts = candidateText.split('[SPEECH_BREAK]');
+                speech = parts[0].trim();
+                advice = parts[1].trim();
+              } else {
+                speech = candidateText.split('\n')[0].replace(/[*#_~`]/g, '').trim();
+                advice = candidateText;
+              }
+
+              const cleanSpeech = speech
+                .replace(/[*#_~`>\[\]\(\)]/g, '')
+                .replace(/\\/g, '')
+                .trim();
+
+              await recordJarvisMemory({
+                timestamp: new Date().toISOString(),
+                topic: prompt.slice(0, 40),
+                userPrompt: prompt,
+                keyInsight: cleanSpeech || advice.slice(0, 150),
+              });
+
+              return NextResponse.json({
+                success: true,
+                reply: advice,
+                speech: cleanSpeech,
+                dispatch: dispatchLogged,
+                source: `gemini-neural (${model.replace('models/', '')})`,
+              });
+            }
+          } else {
+            const errData = await geminiRes.json().catch(() => ({}));
+            console.warn(`Model ${model} failed (${geminiRes.status}):`, errData.error?.message);
+          }
+        } catch (modelErr) {
+          console.warn(`Error calling ${model}:`, modelErr);
+        }
       }
     }
 
-    // 2. High-Performance Cognitive J.A.R.V.I.S. Engine
+    // 2. High-Performance Local Intelligent Copilot Fallback (No "Sir", Charismatic & Clear)
     if (dispatchLogged) {
-      speech = `Consider it done, Sir. I have officially logged that directive for Antigravity, and our engineering logs have been updated.`;
+      speech = `Directive received, Dylan. I have logged that directly into the Sentinel queue for Antigravity, and our engineering logs have been updated.`;
       advice = `### 🛰️ Engineering Dispatch Logged for Antigravity
 
 **Directive ID**: \`${dispatchLogged.id}\`  
@@ -185,19 +261,19 @@ I have logged this in our persistent Sentinel queue. Your pair engineering assis
       lower.includes('money') ||
       lower.includes('numbers')
     ) {
-      speech = `Good day, Sir. Current net take-home profit is $${net.toFixed(2)}, with monthly recurring revenue standing at $${mrr.toFixed(2)} across ${activeSubs} active subscribers. All systems are operating smoothly.`;
-      advice = `### 💎 J.A.R.V.I.S. Executive Briefing
+      speech = `We are sitting at $${net.toFixed(2)} in net profit with monthly recurring revenue at $${mrr.toFixed(2)} across ${activeSubs} active subscribers. PayPal and all systems are running cleanly.`;
+      advice = `### 💎 Executive Commercial Briefing
 
-Good day, Sir. Here is our live commercial status:
+Dylan, here is our live financial status:
 
-* **True Net Profit**: **\$${net.toFixed(2)}** deposited in PayPal (after merchant processing deductions).
+* **True Net Profit**: **\$${net.toFixed(2)}** deposited in PayPal (after all merchant fees).
 * **Gross Customer Volume**: **\$${gross.toFixed(2)}**
 * **Active Subscribers**: **${activeSubs}** producers on the All-Access Studio Pass (\$19.99/mo).
-* **Monthly Recurring Revenue (MRR)**: **\$${mrr.toFixed(2)}** *(Projected ARR: \$${(mrr * 12).toFixed(2)})*.
-* **Catalog Leader**: **${topPlugin}** continues to lead customer acquisition.
+* **Monthly Recurring Revenue (MRR)**: **\$${mrr.toFixed(2)}** *(Annual Run-Rate: \$${(mrr * 12).toFixed(2)})*.
+* **Catalog Leader**: **${topPlugin}** continues to drive top-of-funnel traffic.
 * **Account Health**: Zero PayPal chargebacks. 100% dispute protection actively enforced.
 
-I recommend testing a weekend flash promo on **PLUGTNE** to accelerate net cash flow into the PayPal balance.`;
+Let's test a targeted weekend promo on **PLUGTNE** to accelerate immediate cash flow.`;
     } else if (
       lower.includes('tiktok') ||
       lower.includes('hook') ||
@@ -205,87 +281,31 @@ I recommend testing a weekend flash promo on **PLUGTNE** to accelerate net cash 
       lower.includes('social') ||
       lower.includes('reel')
     ) {
-      speech = `Right away, Sir. I have formulated three high-converting video frameworks optimized for the three-second producer attention span on TikTok.`;
-      advice = `### 🎬 J.A.R.V.I.S. High-Impact Video Playbook (TikTok / Reels / Shorts)
+      speech = `For TikTok, the secret is stopping the scroll in the first two seconds with a side-by-side DAW contrast showing why their vocals sound muddy.`;
+      advice = `### 🎬 High-Converting Video Playbook (TikTok / Reels / Shorts)
 
-Producer attention spans on short-form feeds average 2.4 seconds, Sir. Here are three high-converting concepts engineered for maximum comment engagement and checkout conversion:
+Dylan, producer attention spans on short-form feeds average 2 seconds. The winning formula is the **"Anti-Gatekeep / FL Studio Sauce"** angle:
 
 ---
 
-#### 🎯 Concept 1: The "Why Your Vocal Sounds Cheap" Hook (Focus: PLUGTNE + PLUG VOX)
-* **Opening Visual (0:00 - 0:02)**: Close up on a messy FL Studio mixer with 8 plugins. Red overload meters flashing.
+#### 🎯 Concept 1: The "Why Your Vocal Sounds Cheap" Hook (Focus: PLUGTNE)
+* **Opening Visual (0:00 - 0:02)**: Close-up on a messy FL Studio mixer with 8 plugins. Red overload meters flashing. Text: *"Stop paying $400 for industry autotune."*
 * **Audio**: Muffled, out-of-tune raw vocal.
-* **Spoken Script**: *"Stop stacking 8 plugins to get that modern Travis Scott vocal. You're phasing your vocal chain. Watch this..."*
-* **The Action (0:03 - 0:09)**: Turn off the 8 plugins. Load **PLUGTNE** and **PLUG VOX**. Turn up the Drive and Air knobs. The vocal snaps into crystal-clear radio polish instantly.
+* **The Action (0:03 - 0:09)**: Delete the 8 plugins. Drop **PLUGTNE** onto the mixer. Turn up Correction. The vocal snaps into crystal-clear radio polish instantly with zero latency.
 * **Closing Hook**: *"Link in bio to test it in your DAW today."*
 
 ---
 
 #### 🎯 Concept 2: The 5-Second Soul Chop (Focus: PLUGCHOP 2.0)
-* **Opening Visual (0:00 - 0:02)**: Drag an obscure 1974 vinyl soul loop straight into PLUGCHOP 2.0's 16-pad grid.
-* **Spoken Script**: *"Serato Sample charges $149. Slicex takes 10 minutes to set up. Watch this..."*
+* **Opening Visual (0:00 - 0:02)**: Drag an obscure vinyl soul loop straight into PLUGCHOP 2.0's 16-pad grid.
+* **Spoken Script**: *"Serato Sample charges $149. Watch this..."*
 * **The Action (0:03 - 0:10)**: Tap 4 pads live in an aggressive boom-bap rhythm with half-time engaged.
-* **Closing Hook**: *"Grab the All-Access Pass in bio before launch pricing ends."*
-
----
-
-#### 🎯 Concept 3: The iPhone Speaker 808 Test (Focus: UNDERGRND)
-* **Opening Visual**: Phone recording an 808 beat. It sounds like a quiet click.
-* **Spoken Script**: *"Why do your 808s disappear on mobile phones? Turning up the volume won't fix it. You need harmonic saturation."*
-* **The Action**: Engage **UNDERGRND** Drive at 45%. The phone speaker instantly rattles with heavy analog tube warmth.`;
-    } else if (lower.includes('bundle') || lower.includes('deal') || lower.includes('package') || lower.includes('pricing')) {
-      speech = `I have drafted three strategic bundle configurations, Sir. Launching the Travis Scott Vocal Suite at $119 will immediately elevate our Average Order Value.`;
-      advice = `### 📦 J.A.R.V.I.S. Dynamic Bundle Architecture
-
-To elevate our **Average Order Value (AOV)** from individual $49–$79 sales to over $115 per transaction, Sir, I propose activating these three bundles:
-
----
-
-#### 1. "The Travis Scott & Metro Vocal Suite" — \$119 *(Valued at \$177)*
-* **Included Tools**:
-  1. **PLUGTNE** (Real-time vocal pitch correction — reg. \$79)
-  2. **PLUG VOX** (One-knob vocal compression & air — reg. \$59)
-  3. **PLUGSILKY** (Dynamic presence & high-end sheen — reg. \$39)
-* **Net Margin**: PayPal takes approximately \$3.75, depositing **\$115.25 net cash** directly into your account per sale.
-
----
-
-#### 2. "The Beatmaker Beat-Lab Bundle" — \$129 *(Valued at \$217)*
-* **Included Tools**:
-  1. **PLUGCHOP 2.0** (16-Pad Performance Sampler — reg. \$69)
-  2. **UNDERGRND** (Analog Saturation & 808 Heat — reg. \$49)
-  3. **PLUGGED 1** (Flagship Synth Rompler — reg. \$99)
-* **Target Demographic**: Trap, drill, and boom-bap beatmakers on FL Studio and Ableton.
-
----
-
-#### 3. "The Master Bus Polish Strip" — \$99 *(Valued at \$147)*
-* **Included Tools**: **PLUGEQ** + **PLUGGLUE** + **PLUGLIMIT**.
-* **Positioning**: The modern \$99 alternative to FabFilter's \$700+ mastering bundle.`;
-    } else if (lower.includes('mrr') || lower.includes('scale') || lower.includes('grow') || lower.includes('churn')) {
-      speech = `To reach our $10,000 MRR target, Sir, we must implement our monthly preset drops to virtually eliminate subscriber churn.`;
-      advice = `### 🚀 J.A.R.V.I.S. Roadmap to \$10,000 MRR
-
-To scale from our current baseline to **\$10,000 in Monthly Recurring Revenue**, Sir, we need exactly **500 active producers** on the \$19.99/mo All-Access Studio Pass. Here is our growth blueprint:
-
----
-
-#### 1. The Churn Shield: "The 1st of the Month Drop"
-* The primary reason producers cancel plugin subscriptions is lack of active usage during quiet weeks.
-* **The Solution**: On the 1st of every month, release an exclusive **Producer Preset Pack** (e.g., *"50 Travis Scott Vocal Presets for PLUGTNE"* or *"30 Metro Boomin 808 Patches for UNDERGRND"*).
-* Make this accessible **only** to active subscribers. This keeps monthly churn under 2.5%.
-
-#### 2. The Annual Pass Cash Injection (\$199/yr)
-* Offer an annual option for \$199/year.
-* When 25 users upgrade to annual, you collect **\$4,800+ in pure net profit upfront**, dramatically increasing our cash reserves.
-
-#### 3. The Front-Door Strategy
-* Market **PLUGTNE** and **PLUGCHOP 2.0** as our flagship customer acquisition engines. Once a producer installs Central on their studio computer, upselling them into the All-Access Pass is effortless.`;
+* **Closing Hook**: *"Grab the All-Access Pass in bio before launch pricing ends."*`;
     } else {
-      speech = `At your service, Sir. I have analyzed your request and compiled our strategic directives on your screen.`;
-      advice = `### 🛰️ J.A.R.V.I.S. Strategic Analysis
+      speech = `I have analyzed your request, Dylan. Here is the strategic breakdown on your display.`;
+      advice = `### 🛰️ Strategic Analysis
 
-At your service, Sir. Based on our real-time metrics (Net Take-Home: **\$${net.toFixed(2)}**, MRR: **\$${mrr.toFixed(2)}**, Active Members: **${activeSubs}**):
+Dylan, based on our real-time metrics (Net Cash: **\$${net.toFixed(2)}**, MRR: **\$${mrr.toFixed(2)}**, Active Members: **${activeSubs}**):
 
 ---
 
@@ -294,21 +314,25 @@ At your service, Sir. Based on our real-time metrics (Net Take-Home: **\$${net.t
 2. **Margin Integrity**: Our automated PayPal fee tracking confirms zero leakage, and our "All Sales Final" digital license policy guarantees zero chargeback exposure.
 3. **Continuous Sentinel Oversight**: I am monitoring our cloud database, license authorizations, and payment pipelines 24/7. Any system friction will be flagged to our engineering logs immediately.
 
-How would you like to proceed, Sir?`;
+Ready to deploy whenever you are.`;
     }
 
-    // Record interaction into Jarvis's persistent memory core
+    const cleanSpeech = speech
+      .replace(/[*#_~`>\[\]\(\)]/g, '')
+      .replace(/\\/g, '')
+      .trim();
+
     await recordJarvisMemory({
       timestamp: new Date().toISOString(),
       topic: prompt.slice(0, 40),
       userPrompt: prompt,
-      keyInsight: speech || advice.slice(0, 150),
+      keyInsight: cleanSpeech || advice.slice(0, 150),
     });
 
     return NextResponse.json({
       success: true,
       reply: advice,
-      speech,
+      speech: cleanSpeech,
       dispatch: dispatchLogged,
       source: 'jarvis-cognitive-engine',
     });

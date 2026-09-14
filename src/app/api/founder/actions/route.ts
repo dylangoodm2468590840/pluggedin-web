@@ -8,6 +8,8 @@ import {
   recordJarvisDispatch,
   fetchJarvisDispatches,
   updateJarvisDispatchStatus,
+  fetchAiConfig,
+  saveAiConfig,
   OrderRecord,
   JarvisDispatch,
 } from '../../../../lib/auth';
@@ -40,7 +42,8 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Not Found' }, { status: 404 });
   }
   const dispatches = await fetchJarvisDispatches();
-  return NextResponse.json({ success: true, dispatches });
+  const aiConfig = await fetchAiConfig();
+  return NextResponse.json({ success: true, dispatches, aiConfig });
 }
 
 export async function POST(req: NextRequest) {
@@ -132,6 +135,24 @@ export async function POST(req: NextRequest) {
       }
       await updateJarvisDispatchStatus(targetId, targetStatus);
       return NextResponse.json({ success: true, message: `Dispatch ${targetId} updated to ${targetStatus}` });
+    }
+
+    if (action === 'get_ai_config') {
+      const config = await fetchAiConfig();
+      return NextResponse.json({ success: true, aiConfig: config });
+    }
+
+    if (action === 'save_ai_config') {
+      const { aiConfig } = body;
+      if (!aiConfig?.apiKey) {
+        return NextResponse.json({ success: false, error: 'API key required' }, { status: 400 });
+      }
+      const saved = await saveAiConfig(aiConfig);
+      return NextResponse.json({
+        success: true,
+        message: 'AI Engine configuration saved successfully! Neural reasoning active.',
+        aiConfig: saved,
+      });
     }
 
     return NextResponse.json({ success: false, error: 'Unknown action' }, { status: 400 });

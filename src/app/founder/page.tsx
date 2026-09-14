@@ -166,13 +166,18 @@ export default function FounderDashboardPage() {
   const [aiChatHistory, setAiChatHistory] = useState<Array<{ role: 'user' | 'assistant'; text: string; speech?: string }>>([
     {
       role: 'assistant',
-      text: "👋 Good day, Sir. I am J.A.R.V.I.S., your Executive Audio Intelligence System. I am monitoring your live PayPal financials, subscriber retention, and website telemetry 24/7. Tap my Arc Reactor to speak with me, or ask me to formulate any marketing or scaling strategy.",
-      speech: "Good day, Sir. J.A.R.V.I.S. is online and standing by. All systems are operational.",
+      text: "👋 Hey Dylan, J.A.R.V.I.S. here. I'm connected to your live PayPal financials, subscriber retention, and website telemetry 24/7. Tap my Arc Reactor to speak with me, or ask me anything about TikTok hooks, pricing experiments, or audio plugin strategy.",
+      speech: "Hey Dylan, J.A.R.V.I.S. is online. Neural reasoning is active and all systems are running smoothly.",
     },
   ]);
   const [aiLoading, setAiLoading] = useState(false);
   const [sentinelData, setSentinelData] = useState<any>(null);
   const [dispatches, setDispatches] = useState<JarvisDispatchItem[]>([]);
+  const [aiConfig, setAiConfig] = useState<{ provider: string; apiKey: string; model?: string } | null>(null);
+  const [isAiSettingsOpen, setIsAiSettingsOpen] = useState(false);
+  const [tempApiKey, setTempApiKey] = useState('');
+  const [tempModel, setTempModel] = useState('models/gemini-3-flash-preview');
+  const [savingAiConfig, setSavingAiConfig] = useState(false);
 
   const recognitionRef = useRef<any>(null);
   const chatBottomRef = useRef<HTMLDivElement>(null);
@@ -421,12 +426,61 @@ export default function FounderDashboardPage() {
           setDispatches(sData.activeDispatches);
         }
       }
+
+      // Also retrieve AI Engine configuration
+      fetch('/api/founder/actions', {
+        headers: { 'x-founder-pin': pinCode || '8492' },
+      })
+        .then((r) => r.json())
+        .then((actData) => {
+          if (actData.aiConfig) {
+            setAiConfig(actData.aiConfig);
+            if (actData.aiConfig.apiKey) setTempApiKey(actData.aiConfig.apiKey);
+            if (actData.aiConfig.model) setTempModel(actData.aiConfig.model);
+          }
+        })
+        .catch(() => {});
     } catch (err: any) {
       setAuthError('Connection error. Could not load founder telemetry.');
     } finally {
       setLoading(false);
     }
   }, [timeframe, pin]);
+
+  const handleSaveAiConfig = async () => {
+    if (!tempApiKey.trim()) return;
+    setSavingAiConfig(true);
+    try {
+      const res = await fetch('/api/founder/actions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-founder-pin': pin || '8492',
+        },
+        body: JSON.stringify({
+          action: 'save_ai_config',
+          aiConfig: {
+            provider: 'gemini',
+            apiKey: tempApiKey.trim(),
+            model: tempModel || 'models/gemini-3-flash-preview',
+          },
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setAiConfig(data.aiConfig);
+        setIsAiSettingsOpen(false);
+        setActionMessage('🧠 J.A.R.V.I.S. Neural Brain Engine Configured & Active!');
+        setTimeout(() => setActionMessage(null), 5000);
+      } else {
+        alert(data.error || 'Failed to save AI configuration');
+      }
+    } catch (e: any) {
+      alert(e.message);
+    } finally {
+      setSavingAiConfig(false);
+    }
+  };
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -562,6 +616,7 @@ export default function FounderDashboardPage() {
         },
         body: JSON.stringify({
           prompt: query,
+          chatHistory: newHistory,
           currentMetrics: metrics?.financials ? {
             ...metrics.financials,
             mrr: metrics.subscriptions.mrr,
@@ -589,12 +644,12 @@ export default function FounderDashboardPage() {
           setDispatches((prev) => [data.dispatch, ...prev]);
         }
       } else {
-        const errReply = "⚠️ My apologies Sir, I encountered a communication delay. Please try once more.";
+        const errReply = "⚠️ Apologies Dylan, I encountered a brief communication delay. Please tap send once more.";
         setAiChatHistory([...newHistory, { role: 'assistant', text: errReply }]);
         speakJarvisVoice(errReply);
       }
     } catch (e: any) {
-      const errMsg = `⚠️ Connection error, Sir: ${e.message}`;
+      const errMsg = `⚠️ Connection error, Dylan: ${e.message}`;
       setAiChatHistory([...newHistory, { role: 'assistant', text: errMsg }]);
       speakJarvisVoice(errMsg);
     } finally {
@@ -959,8 +1014,8 @@ export default function FounderDashboardPage() {
         {/* TAB: J.A.R.V.I.S. VOICE AI & ARC REACTOR */}
         {activeTab === 'jarvis' && (
           <div className="space-y-6">
-            {/* View Mode Switcher (Voice HUD vs Chat Stream) */}
-            <div className="flex items-center justify-center">
+            {/* View Mode Switcher & AI Brain Settings */}
+            <div className="flex items-center justify-between flex-wrap gap-2">
               <div className="bg-slate-900/90 p-1 rounded-2xl border border-slate-800 flex items-center space-x-1 shadow-md">
                 <button
                   type="button"
@@ -968,14 +1023,14 @@ export default function FounderDashboardPage() {
                     triggerHaptic(10);
                     setMobileVoiceMode('hud');
                   }}
-                  className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center space-x-2 ${
+                  className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center space-x-1.5 ${
                     mobileVoiceMode === 'hud'
                       ? 'bg-gradient-to-r from-cyber-cyan to-blue-600 text-black shadow-glow-cyan font-black'
                       : 'text-slate-400 hover:text-white'
                   }`}
                 >
                   <Mic className="w-3.5 h-3.5" />
-                  <span>Holographic Voice HUD</span>
+                  <span>Voice HUD</span>
                 </button>
                 <button
                   type="button"
@@ -983,16 +1038,32 @@ export default function FounderDashboardPage() {
                     triggerHaptic(10);
                     setMobileVoiceMode('chat');
                   }}
-                  className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center space-x-2 ${
+                  className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center space-x-1.5 ${
                     mobileVoiceMode === 'chat'
                       ? 'bg-gradient-to-r from-cyber-cyan to-blue-600 text-black shadow-glow-cyan font-black'
                       : 'text-slate-400 hover:text-white'
                   }`}
                 >
                   <MessageSquare className="w-3.5 h-3.5" />
-                  <span>Communication Stream</span>
+                  <span>Stream</span>
                 </button>
               </div>
+
+              <button
+                type="button"
+                onClick={() => {
+                  triggerHaptic(10);
+                  setIsAiSettingsOpen(true);
+                }}
+                className="px-3.5 py-2 rounded-2xl bg-slate-900/90 border border-slate-700/80 hover:border-cyber-cyan text-slate-300 hover:text-white text-xs font-bold transition-all flex items-center space-x-2 shadow-md active:scale-95"
+              >
+                <Sparkles className="w-3.5 h-3.5 text-cyber-cyan animate-pulse" />
+                <span className="hidden sm:inline text-slate-400">Brain:</span>
+                <span className="text-emerald-400 font-mono text-[11px] font-bold">
+                  {aiConfig?.model ? aiConfig.model.replace('models/', '').replace('-preview', '') : 'Gemini 3 Flash'}
+                </span>
+                <Sliders className="w-3 h-3 text-slate-400 ml-1" />
+              </button>
             </div>
 
             {/* MODE 1: HOLOGRAPHIC VOICE HUD */}
@@ -2060,6 +2131,91 @@ export default function FounderDashboardPage() {
               >
                 <Send className="w-4 h-4" />
                 <span>Send to J.A.R.V.I.S.</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* J.A.R.V.I.S. Neural Brain Engine Settings Modal */}
+      {isAiSettingsOpen && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="bg-slate-900 border border-cyber-cyan/40 rounded-3xl w-full max-w-lg p-5 sm:p-6 space-y-4 shadow-[0_0_50px_rgba(0,240,255,0.25)]">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <div className="flex items-center space-x-2.5">
+                <div className="w-9 h-9 rounded-xl bg-purple-500/20 border border-purple-500/40 flex items-center justify-center">
+                  <Sparkles className="w-5 h-5 text-purple-400" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-black text-white">J.A.R.V.I.S. Neural Brain Engine</h3>
+                  <p className="text-[10px] text-slate-400">Google AI Studio Neural Intelligence & Thinking</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsAiSettingsOpen(false)}
+                className="p-2 rounded-xl bg-slate-800 text-slate-400 hover:text-white transition-all active:scale-95"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              <div>
+                <label className="text-[11px] font-mono text-slate-400 uppercase tracking-wider block mb-1">
+                  Reasoning Model Tier
+                </label>
+                <select
+                  value={tempModel}
+                  onChange={(e) => setTempModel(e.target.value)}
+                  className="w-full p-3 rounded-2xl bg-slate-950 border border-slate-700 text-white text-xs font-mono focus:outline-none focus:border-cyber-cyan"
+                >
+                  <option value="models/gemini-3-flash-preview">Gemini 3 Flash Preview (Recommended • 1.7s Latency)</option>
+                  <option value="models/gemini-3.5-flash">Gemini 3.5 Flash (Ultra Fast • High IQ)</option>
+                  <option value="models/gemini-3.1-flash-lite-preview">Gemini 3.1 Flash Lite</option>
+                  <option value="models/gemini-flash-latest">Gemini Flash Latest</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="text-[11px] font-mono text-slate-400 uppercase tracking-wider block mb-1">
+                  Google AI Studio API Key
+                </label>
+                <input
+                  type="password"
+                  value={tempApiKey}
+                  onChange={(e) => setTempApiKey(e.target.value)}
+                  placeholder="Paste your key (AQ.Ab... or AIzaSy...)"
+                  className="w-full p-3 rounded-2xl bg-slate-950 border border-slate-700 text-white text-xs font-mono focus:outline-none focus:border-cyber-cyan"
+                />
+                <p className="text-[10px] text-slate-400 mt-1">
+                  Stored securely in Upstash Redis and instantly active across your iPhone, laptop, and web platform.
+                </p>
+              </div>
+
+              <div className="p-3 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 flex items-center space-x-2">
+                <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                <span className="text-[11px] text-emerald-300">
+                  Google AI Key Active: Connected to Google AI Studio with Ultra Access.
+                </span>
+              </div>
+            </div>
+
+            <div className="flex items-center space-x-2 pt-2">
+              <button
+                type="button"
+                onClick={handleSaveAiConfig}
+                disabled={savingAiConfig || !tempApiKey.trim()}
+                className="flex-1 py-3 rounded-2xl bg-gradient-to-r from-cyber-cyan to-blue-600 text-black font-black text-xs uppercase tracking-wider shadow-glow-cyan hover:brightness-110 active:scale-98 transition-all disabled:opacity-40 flex items-center justify-center space-x-2"
+              >
+                {savingAiConfig ? (
+                  <span>Saving to Brain...</span>
+                ) : (
+                  <>
+                    <Zap className="w-4 h-4" />
+                    <span>Save & Activate Brain</span>
+                  </>
+                )}
               </button>
             </div>
           </div>

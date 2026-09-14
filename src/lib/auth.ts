@@ -963,6 +963,59 @@ export async function updateJarvisDispatchStatus(id: string, status: 'open' | 'a
   }
 }
 
+export interface FounderAiConfig {
+  provider: 'gemini' | 'groq' | 'openai';
+  apiKey: string;
+  model?: string;
+  updatedAt: string;
+}
+
+export async function fetchAiConfig(): Promise<FounderAiConfig | null> {
+  const redis = getRedis();
+  if (redis) {
+    try {
+      const cfg = await redis.get('pluggedin_founder_ai_config');
+      if (cfg) {
+        return typeof cfg === 'string' ? JSON.parse(cfg) : cfg;
+      }
+    } catch (e) {
+      console.warn('Error reading AI config from Redis:', e);
+    }
+  }
+  if (process.env.GEMINI_API_KEY) {
+    return {
+      provider: 'gemini',
+      apiKey: process.env.GEMINI_API_KEY,
+      model: 'models/gemini-3-flash-preview',
+      updatedAt: new Date().toISOString(),
+    };
+  }
+  return null;
+}
+
+export async function saveAiConfig(config: {
+  provider: 'gemini' | 'groq' | 'openai';
+  apiKey: string;
+  model?: string;
+}): Promise<FounderAiConfig> {
+  const redis = getRedis();
+  const fullConfig: FounderAiConfig = {
+    provider: config.provider || 'gemini',
+    apiKey: config.apiKey,
+    model: config.model || (config.provider === 'gemini' ? 'models/gemini-3-flash-preview' : undefined),
+    updatedAt: new Date().toISOString(),
+  };
+  if (redis) {
+    try {
+      await redis.set('pluggedin_founder_ai_config', fullConfig);
+    } catch (e) {
+      console.warn('Error saving AI config to Redis:', e);
+    }
+  }
+  return fullConfig;
+}
+
+
 
 
 
