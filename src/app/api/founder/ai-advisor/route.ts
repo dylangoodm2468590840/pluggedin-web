@@ -40,7 +40,7 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json();
-    const { prompt, currentMetrics, chatHistory } = body;
+    const { prompt, currentMetrics, chatHistory, audioUrl, audioFilename } = body;
 
     if (!prompt || typeof prompt !== 'string') {
       return NextResponse.json({ success: false, error: 'Prompt is required.' }, { status: 400 });
@@ -65,6 +65,11 @@ export async function POST(req: NextRequest) {
     }
 
     const lower = prompt.toLowerCase();
+    let attachedAudioNote = '';
+    if (audioUrl) {
+      attachedAudioNote = `\n[FOUNDER AUDIO ATTACHMENT]: Dylan uploaded an authentic audio file for this task: "${audioFilename || 'custom_audio'}" at URL "${audioUrl}". Prioritize using this audio file in any video ad or DSP chain demonstration.\n`;
+    }
+
     let advice = '';
     let speech = '';
     let dispatchLogged: JarvisDispatch | null = null;
@@ -162,6 +167,31 @@ When explaining marketing funnels, TikTok concepts, PowerPoint presentations, vo
   ]
 }
 
+
+[PLUGIN_SPEC]
+When Dylan asks to design, formulate, invent, or brainstorm a NEW plugin idea or R&D project, output:
+[PLUGIN_SPEC]
+{
+  "name": "PLUGIN_NAME",
+  "tagline": "Short punchy description",
+  "category": "e.g. Vocal Chain / Granular Reverb / Saturation / Sampler",
+  "chassisTheme": "cyberpunk_cyan",
+  "controls": [
+    { "id": "drive", "label": "DRIVE", "type": "knob", "defaultValue": 65, "unit": "%" },
+    { "id": "tone", "label": "TONE", "type": "knob", "defaultValue": 50, "unit": "%" },
+    { "id": "mix", "label": "MIX", "type": "knob", "defaultValue": 100, "unit": "%" }
+  ],
+  "dspBreakdown": [
+    "Mathematical DSP algorithm point 1",
+    "Analog saturation / filter pole curve point 2",
+    "Sub-sample phase alignment & transient preservation point 3"
+  ],
+  "competitorEdge": "Runs at 0.5% CPU in FL Studio with zero latency, beating bloated competitors by $150.",
+  "targetBpmKey": "FL Studio 140 BPM Trap",
+  "cppSnippet": "// Ready to compile C++ JUCE DSP snippet\nclass PluginDSP { ... };"
+}
+[/PLUGIN_SPEC]
+
 [AD_VIDEO]
 When Dylan asks to create, generate, script, or brainstorm an ad, video ad, TikTok promo, or commercial for any plugin (e.g. PLUGTNE, UNDERGRND, PLUGCHOP, PLUG VOX), generate an interactive video ad JSON block:
 {
@@ -255,7 +285,7 @@ When Dylan asks to create, generate, script, or brainstorm an ad, video ad, TikT
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
                 systemInstruction: {
-                  parts: [{ text: systemInstructionText }],
+                  parts: [{ text: systemInstructionText + attachedAudioNote }],
                 },
                 contents: formattedContents,
                 generationConfig: {
@@ -272,6 +302,21 @@ When Dylan asks to create, generate, script, or brainstorm an ad, video ad, TikT
             if (candidateText) {
               let deckData: any = null;
               let videoAdData: any = null;
+              let pluginSpecData: any = null;
+
+              if (candidateText.includes('[PLUGIN_SPEC]')) {
+                const specParts = candidateText.split('[PLUGIN_SPEC]');
+                candidateText = specParts[0].trim();
+                const rawSpec = specParts[1].split('[/PLUGIN_SPEC]')[0].trim();
+                const jsonMatch = rawSpec.match(/\{[\s\S]*\}/);
+                if (jsonMatch) {
+                  try {
+                    pluginSpecData = JSON.parse(jsonMatch[0]);
+                  } catch (e) {
+                    console.warn('Failed to parse plugin spec JSON:', e);
+                  }
+                }
+              }
 
               if (candidateText.includes('[AD_VIDEO]')) {
                 const videoParts = candidateText.split('[AD_VIDEO]');
@@ -385,12 +430,18 @@ When Dylan asks to create, generate, script, or brainstorm an ad, video ad, TikT
                 keyInsight: cleanSpeech || advice.slice(0, 150),
               });
 
+              if (videoAdData && audioUrl) {
+                videoAdData.audioDryUrl = audioUrl;
+                videoAdData.audioWetUrl = audioUrl;
+              }
+
               return NextResponse.json({
                 success: true,
                 reply: advice,
                 speech: cleanSpeech,
                 deck: deckData,
                 videoAd: videoAdData,
+                pluginSpec: pluginSpecData,
                 dispatch: dispatchLogged,
                 source: `gemini-neural (${model.replace('models/', '')})`,
               });

@@ -45,6 +45,9 @@ import {
 } from 'lucide-react';
 import JarvisPresentationCanvas, { JarvisPresentationDeck } from '@/components/JarvisPresentationCanvas';
 import JarvisVideoAdStudio, { JarvisVideoAd } from '@/components/JarvisVideoAdStudio';
+import JarvisPluginLab, { PluginSpec } from '@/components/JarvisPluginLab';
+import SocialCommandCenter from '@/components/SocialCommandCenter';
+import { Paperclip, Plus, History, Share2 } from 'lucide-react';
 
 interface Financials {
   grossTotal: number;
@@ -176,6 +179,8 @@ export default function FounderDashboardPage() {
       speech?: string;
       deck?: JarvisPresentationDeck;
       videoAd?: JarvisVideoAd;
+      pluginSpec?: PluginSpec;
+      attachedAudioName?: string;
     }>
   >([
     {
@@ -185,6 +190,32 @@ export default function FounderDashboardPage() {
     },
   ]);
   const [aiLoading, setAiLoading] = useState(false);
+  const [activeNavTab, setActiveNavTab] = useState<'studio' | 'social' | 'analytics'>('studio');
+  const [attachedAudioFile, setAttachedAudioFile] = useState<File | null>(null);
+  const [isUploadingAudio, setIsUploadingAudio] = useState(false);
+  const audioInputRef = useRef<HTMLInputElement | null>(null);
+  const [chatHistoryDrawerOpen, setChatHistoryDrawerOpen] = useState(false);
+  const [pastThreads, setPastThreads] = useState<Array<{ id: string; title: string; date: string }>>([
+    { id: 'thread_001', title: 'PLUGTNE 0ms Autotune TikTok Campaign', date: 'Today at 10:15 AM' },
+    { id: 'thread_002', title: 'UNDERGRND 12AX7 Tube 808 Strategy', date: 'Yesterday at 3:45 PM' },
+    { id: 'thread_003', title: 'PLUGCHOP 16-Pad Hip-Hop Flip', date: 'Sep 12, 1:20 PM' },
+  ]);
+
+  const startNewChat = () => {
+    triggerHaptic(15);
+    setAiChatHistory([
+      {
+        role: 'assistant',
+        text: "👋 Brand new studio session initialized, Dylan. Global long-term memory is active and I retain full context of our store metrics, plugins, and previous campaigns. What are we planning or building?",
+        speech: "Brand new session ready, Dylan. What are we planning or building?",
+      },
+    ]);
+    setActiveDeck(null);
+    setAttachedAudioFile(null);
+    setChatHistoryDrawerOpen(false);
+    speakJarvisVoice("Brand new session ready, Dylan. What are we planning or building?");
+  };
+
   const [activeDeck, setActiveDeck] = useState<JarvisPresentationDeck | null>(null);
   const [sentinelData, setSentinelData] = useState<any>(null);
   const [dispatches, setDispatches] = useState<JarvisDispatchItem[]>([]);
@@ -688,7 +719,37 @@ export default function FounderDashboardPage() {
     unlockAudioOnTouch();
     triggerHaptic(15);
 
-    const newHistory = [...aiChatHistory, { role: 'user' as const, text: query }];
+    
+    let uploadedAudioUrl = '';
+    let uploadedAudioName = '';
+    if (attachedAudioFile) {
+      setIsUploadingAudio(true);
+      try {
+        const formData = new FormData();
+        formData.append('file', attachedAudioFile);
+        const upRes = await fetch(`/api/founder/upload-audio?pin=${pin || '8492'}`, {
+          method: 'POST',
+          headers: {
+            'x-founder-pin': pin || '8492',
+          },
+          body: formData,
+        });
+        if (upRes.ok) {
+          const upData = await upRes.json();
+          if (upData.success) {
+            uploadedAudioUrl = upData.url;
+            uploadedAudioName = attachedAudioFile.name;
+          }
+        }
+      } catch (err) {
+        console.warn('Could not upload attached audio:', err);
+      } finally {
+        setIsUploadingAudio(false);
+        setAttachedAudioFile(null);
+      }
+    }
+
+    const newHistory = [...aiChatHistory, { role: 'user' as const, text: query, attachedAudioName: uploadedAudioName || undefined }];
     setAiChatHistory(newHistory);
     setAiPrompt('');
     setAiLoading(true);
@@ -710,6 +771,8 @@ export default function FounderDashboardPage() {
             conversionRatePct: metrics.traffic.conversionRatePct,
             topPlugin: metrics.pluginLeaderboard[0]?.name || 'PLUGTNE',
           } : undefined,
+          audioUrl: uploadedAudioUrl || undefined,
+          audioFilename: uploadedAudioName || undefined,
         }),
       });
 
@@ -726,6 +789,7 @@ export default function FounderDashboardPage() {
             speech: data.speech,
             deck: data.deck,
             videoAd: data.videoAd,
+            pluginSpec: data.pluginSpec,
           },
         ]);
 
@@ -888,6 +952,29 @@ export default function FounderDashboardPage() {
             </div>
             <div>
               <div className="flex items-center space-x-2">
+
+                {/* + New Chat & History Buttons */}
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={startNewChat}
+                    className="px-3 py-1.5 rounded-xl bg-cyber-cyan/15 hover:bg-cyber-cyan/25 text-cyber-cyan border border-cyber-cyan/30 text-xs font-mono font-bold transition-all flex items-center gap-1.5 active:scale-95 shadow-sm"
+                    title="Start a fresh chat thread"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>New Chat</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setChatHistoryDrawerOpen(!chatHistoryDrawerOpen)}
+                    className="px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-700 text-xs font-mono transition-all flex items-center gap-1.5 active:scale-95"
+                    title="View past conversations"
+                  >
+                    <History className="w-3.5 h-3.5" />
+                    <span>Past Chats</span>
+                  </button>
+                </div>
+
                 <span className="text-base font-black tracking-wider text-white">J.A.R.V.I.S.</span>
                 <span className="text-[10px] font-mono bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-2 py-0.5 rounded-full font-bold">
                   ONLINE
@@ -1229,6 +1316,15 @@ export default function FounderDashboardPage() {
                         </div>
                       )}
 
+                      
+                      {/* Attached Audio Badge on User Prompt */}
+                      {msg.attachedAudioName && (
+                        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-cyber-cyan/15 text-cyber-cyan border border-cyber-cyan/30 text-xs font-mono mb-2">
+                          <Paperclip className="w-3.5 h-3.5" />
+                          <span>Attached: {msg.attachedAudioName}</span>
+                        </div>
+                      )}
+
                       {/* Main Highly-Readable Text Content */}
                       <div className="whitespace-pre-wrap font-normal">{msg.text}</div>
 
@@ -1245,6 +1341,13 @@ export default function FounderDashboardPage() {
                           <JarvisVideoAdStudio videoAd={msg.videoAd} />
                         </div>
                       )}
+                      {/* Embedded AI Plugin R&D Lab */}
+                      {msg.pluginSpec && (
+                        <div className="mt-4 pt-4 border-t border-slate-800">
+                          <JarvisPluginLab spec={msg.pluginSpec} />
+                        </div>
+                      )}
+
                     </div>
                   </div>
                 ))}
@@ -1295,6 +1398,27 @@ export default function FounderDashboardPage() {
                 </div>
               </div>
 
+              
+              {/* Attached Audio Preview Chip */}
+              {attachedAudioFile && (
+                <div className="flex items-center justify-between px-3.5 py-2 rounded-xl bg-cyber-cyan/15 border border-cyber-cyan/40 text-cyber-cyan text-xs font-mono mb-2">
+                  <div className="flex items-center gap-2 truncate">
+                    <Paperclip className="w-4 h-4 shrink-0" />
+                    <span className="truncate font-bold">Attached: {attachedAudioFile.name} ({(attachedAudioFile.size / 1024).toFixed(0)} KB)</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAttachedAudioFile(null);
+                      if (audioInputRef.current) audioInputRef.current.value = '';
+                    }}
+                    className="p-1 hover:text-white transition-colors"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              )}
+
               {/* Sleek Floating Input Bar Dock */}
               <form
                 onSubmit={(e) => {
@@ -1323,6 +1447,34 @@ export default function FounderDashboardPage() {
                   ) : (
                     <Mic className="w-5 h-5" />
                   )}
+                </button>
+
+                
+                {/* Audio Attachment Button */}
+                <input
+                  type="file"
+                  ref={audioInputRef}
+                  accept="audio/*,.wav,.mp3,.m4a"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) {
+                      setAttachedAudioFile(file);
+                      triggerHaptic(15);
+                    }
+                  }}
+                  className="hidden"
+                />
+                <button
+                  type="button"
+                  onClick={() => audioInputRef.current?.click()}
+                  className={`w-12 h-12 rounded-2xl border flex items-center justify-center shrink-0 transition-all active:scale-95 ${
+                    attachedAudioFile
+                      ? 'bg-cyber-cyan text-black border-cyber-cyan font-bold shadow-[0_0_15px_rgba(0,240,255,0.4)]'
+                      : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
+                  }`}
+                  title="Attach Vocal or Sample (.wav, .mp3)"
+                >
+                  <Paperclip className="w-5 h-5" />
                 </button>
 
                 {/* Siri Dictation Trigger (Mobile Friendly) */}
