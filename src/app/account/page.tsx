@@ -56,6 +56,9 @@ export default function AccountPage() {
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [resetToken, setResetToken] = useState('');
+  const [promoCode, setPromoCode] = useState('');
+  const [redeemingPromo, setRedeemingPromo] = useState(false);
+  const [promoMessage, setPromoMessage] = useState<string | null>(null);
 
   // Status banners & device actions
   const [loading, setLoading] = useState(false);
@@ -154,15 +157,29 @@ export default function AccountPage() {
     setLoading(true);
 
     try {
-      const res = await fetch('/api/auth/register', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email: email.trim(),
-          password,
-          displayName: displayName.trim() || undefined,
-        }),
-      });
+      let res: Response;
+      if (promoCode.trim()) {
+        res = await fetch('/api/promo/claim', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            code: promoCode.trim(),
+            email: email.trim(),
+            password,
+            displayName: displayName.trim() || undefined,
+          }),
+        });
+      } else {
+        res = await fetch('/api/auth/register', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: email.trim(),
+            password,
+            displayName: displayName.trim() || undefined,
+          }),
+        });
+      }
       const data = await res.json();
 
       if (!res.ok || !data.success) {
@@ -170,12 +187,47 @@ export default function AccountPage() {
       } else {
         setCurrentUser(data.user);
         localStorage.setItem('pluggedin_web_user', JSON.stringify(data.user));
-        setSuccessMessage('Account created successfully! You are now signed in forever.');
+        setSuccessMessage(
+          promoCode.trim()
+            ? '🎉 VIP Account Created! Lifetime VIP Pass Unlocked with 5 Computers.'
+            : 'Account created successfully! You are now signed in forever.'
+        );
       }
     } catch {
       setErrorMessage('Network error while registering. Please try again.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleRedeemPromo = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!promoCode.trim()) return;
+    setRedeemingPromo(true);
+    setPromoMessage(null);
+
+    try {
+      const res = await fetch('/api/promo/claim', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          code: promoCode.trim(),
+          email: currentUser?.email,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        setPromoMessage(data.error || 'Failed to redeem promo code.');
+      } else {
+        setCurrentUser(data.user);
+        localStorage.setItem('pluggedin_web_user', JSON.stringify(data.user));
+        setPromoMessage(`🎉 Success! ${data.message}`);
+        setPromoCode('');
+      }
+    } catch {
+      setPromoMessage('Network error redeeming promo code.');
+    } finally {
+      setRedeemingPromo(false);
     }
   };
 
@@ -474,6 +526,53 @@ export default function AccountPage() {
             </div>
           </div>
 
+          {/* VIP Promo Code Redemption */}
+          <div className="glass-panel rounded-3xl p-6 sm:p-8 border border-amber-500/30 bg-gradient-to-r from-amber-500/10 via-transparent to-transparent space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <span className="text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40">
+                  REDEEM VIP PROMO CODE
+                </span>
+                <h3 className="text-lg font-black text-white mt-2">Have a Founder or VIP Code?</h3>
+                <p className="text-xs text-slate-400">
+                  Enter your friend or promo code to immediately unlock 100% Free Lifetime VIP and 5 computer activations.
+                </p>
+              </div>
+
+              <form onSubmit={handleRedeemPromo} className="flex items-center space-x-2 w-full sm:w-auto">
+                <input
+                  type="text"
+                  placeholder="e.g. PLUGGED-VIP-DYLAN-8492-X9Q7"
+                  value={promoCode}
+                  onChange={(e) => setPromoCode(e.target.value.toUpperCase())}
+                  className="px-4 py-2.5 rounded-xl bg-studio-950 border border-amber-500/30 text-amber-300 placeholder-slate-600 text-xs font-mono uppercase focus:outline-none focus:border-amber-400 min-w-[240px]"
+                />
+                <button
+                  type="submit"
+                  disabled={redeemingPromo || !promoCode.trim()}
+                  className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-amber-400 to-amber-500 hover:brightness-110 text-black text-xs font-black transition-all disabled:opacity-50 whitespace-nowrap shadow-glow-amber"
+                >
+                  {redeemingPromo ? 'Unlocking...' : 'Redeem Code'}
+                </button>
+              </form>
+            </div>
+
+            {promoMessage && (
+              <div className={`p-3 rounded-xl text-xs flex items-center space-x-2 ${
+                promoMessage.includes('Success') || promoMessage.includes('Claimed')
+                  ? 'bg-emerald-500/10 border border-emerald-500/30 text-emerald-400'
+                  : 'bg-rose-500/10 border border-rose-500/30 text-rose-400'
+              }`}>
+                {promoMessage.includes('Success') || promoMessage.includes('Claimed') ? (
+                  <CheckCircle2 className="w-4 h-4 shrink-0" />
+                ) : (
+                  <AlertCircle className="w-4 h-4 shrink-0" />
+                )}
+                <span>{promoMessage}</span>
+              </div>
+            )}
+          </div>
+
           {/* Authorized Computers & DAW Activations */}
           <div className="glass-panel rounded-3xl p-6 sm:p-8 border border-white/10 space-y-6">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -757,10 +856,29 @@ export default function AccountPage() {
                   </div>
                 </div>
 
+                <div>
+                  <label className="block text-xs font-medium text-amber-300 mb-1.5 flex items-center justify-between">
+                    <span className="flex items-center space-x-1">
+                      <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                      <span>VIP Promo / Friend Code (Optional)</span>
+                    </span>
+                    <span className="text-[10px] text-emerald-400 font-bold">100% Free Lifetime Pass</span>
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="text"
+                      placeholder="e.g. PLUGGED-VIP-DYLAN-8492-X9Q7"
+                      value={promoCode}
+                      onChange={(e) => setPromoCode(e.target.value.toUpperCase())}
+                      className="w-full px-4 py-3 rounded-xl bg-studio-900 border border-amber-500/40 text-amber-300 placeholder-slate-600 text-xs font-mono uppercase focus:outline-none focus:border-amber-400"
+                    />
+                  </div>
+                </div>
+
                 <button
                   type="submit"
                   disabled={loading}
-                  className="w-full py-3.5 rounded-xl bg-cyber-purple hover:bg-cyber-purple/90 text-white text-xs font-black shadow-glow-purple transition-all disabled:opacity-50 mt-2"
+                  className="w-full py-3.5 rounded-xl bg-gradient-to-r from-cyber-purple to-pink-600 hover:brightness-110 text-white text-xs font-black shadow-glow-purple transition-all disabled:opacity-50 mt-2"
                 >
                   {loading ? 'Creating Account...' : 'Create Account & Save Credentials'}
                 </button>
