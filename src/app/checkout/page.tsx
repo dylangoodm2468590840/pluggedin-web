@@ -156,7 +156,12 @@ export default function CheckoutPage() {
         return;
       }
 
-      const activeCode = appliedPromo?.code || promoCode.trim() || 'DYLANVIP';
+      const activeCode = appliedPromo?.code || promoCode.trim();
+      if (!activeCode) {
+        setCheckoutError('Please enter a valid promo code.');
+        setSubmitting(false);
+        return;
+      }
 
       const claimRes = await fetch('/api/promo/claim', {
         method: 'POST',
@@ -223,26 +228,6 @@ export default function CheckoutPage() {
               ? 'Lifetime perpetual license with free updates and 3 machine authorizations.'
               : 'Instant access to all 15 plugins, PluggedIN Central cloud licensing, and all future drops.'}
           </p>
-        </div>
-      )}
-
-      {/* Prominent VIP promo banner if not yet applied */}
-      {!appliedPromo && (
-        <div className="mb-8 p-4 rounded-2xl bg-gradient-to-r from-amber-500/10 via-cyber-purple/10 to-transparent border border-amber-500/30 flex flex-col sm:flex-row items-center justify-between gap-3 text-center sm:text-left">
-          <div className="flex items-center space-x-3">
-            <div className="w-9 h-9 rounded-xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center shrink-0">
-              <Sparkles className="w-4 h-4 text-amber-400" />
-            </div>
-            <div>
-              <span className="text-xs font-bold text-amber-300 block">Have a VIP or Friend Code?</span>
-              <span className="text-[11px] text-slate-400 block">
-                Enter your code in the order summary on the right to unlock 100% Free Lifetime Access!
-              </span>
-            </div>
-          </div>
-          <span className="text-[10px] font-mono font-bold text-amber-300 bg-amber-500/20 px-3 py-1.5 rounded-xl border border-amber-500/30 shrink-0">
-            e.g. DYLANVIP
-          </span>
         </div>
       )}
 
@@ -450,16 +435,16 @@ export default function CheckoutPage() {
               </div>
             </div>
 
-            {/* VIP Promo Code Section - Always open & visible */}
+            {/* Standard Promo Code Section */}
             <div className="pt-3 border-t border-white/10 space-y-2">
               <div className="flex items-center justify-between">
-                <label className="text-xs font-bold text-amber-300 flex items-center space-x-1.5">
-                  <Tag className="w-3.5 h-3.5 text-amber-400" />
-                  <span>VIP Promo / Friend Code</span>
+                <label className="text-xs font-semibold text-slate-300 flex items-center space-x-1.5">
+                  <Tag className="w-3.5 h-3.5 text-slate-400" />
+                  <span>Promo Code</span>
                 </label>
                 {appliedPromo && (
                   <span className="text-[10px] font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
-                    100% OFF UNLOCKED
+                    DISCOUNT APPLIED
                   </span>
                 )}
               </div>
@@ -469,15 +454,15 @@ export default function CheckoutPage() {
                   <div className="flex space-x-2">
                     <input
                       type="text"
-                      placeholder="e.g. DYLANVIP"
+                      placeholder="Enter promo code"
                       value={promoCode}
                       onChange={(e) => setPromoCode(e.target.value.toUpperCase())}
-                      className="flex-1 px-3.5 py-2.5 rounded-xl bg-studio-900 border border-amber-500/30 text-amber-300 placeholder-slate-600 text-xs font-mono uppercase focus:outline-none focus:border-amber-400"
+                      className="flex-1 px-3.5 py-2.5 rounded-xl bg-studio-900 border border-white/10 text-white placeholder-slate-500 text-xs font-mono uppercase focus:outline-none focus:border-white/30"
                     />
                     <button
                       type="submit"
                       disabled={promoLoading || !promoCode.trim()}
-                      className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-amber-400 to-amber-500 hover:brightness-110 text-black text-xs font-black transition-all disabled:opacity-50 whitespace-nowrap shadow-glow-amber"
+                      className="px-4 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-semibold transition-all disabled:opacity-50 whitespace-nowrap border border-white/10"
                     >
                       {promoLoading ? '...' : 'Apply'}
                     </button>
@@ -490,8 +475,8 @@ export default function CheckoutPage() {
                   )}
                 </form>
               ) : (
-                <div className="p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs flex items-center justify-between">
-                  <span className="flex items-center space-x-2 font-bold">
+                <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs flex items-center justify-between">
+                  <span className="flex items-center space-x-2 font-medium">
                     <Check className="w-4 h-4 shrink-0" />
                     <span>{appliedPromo.message}</span>
                   </span>
@@ -626,13 +611,13 @@ export default function CheckoutPage() {
                 </div>
               ) : (
                 // VIP Early Access Box when PayPal not configured
-                <div className="p-4 rounded-2xl bg-studio-900 border border-cyber-cyan/30 text-center space-y-2">
+                <div className="p-4 rounded-2xl bg-studio-900 border border-white/10 text-center space-y-2">
                   <div className="inline-flex items-center space-x-1.5 text-xs font-bold text-cyber-cyan">
                     <ShieldCheck className="w-4 h-4" />
-                    <span>VIP Early Access Checkout</span>
+                    <span>Secure Checkout</span>
                   </div>
-                  <p className="text-[11px] text-slate-300 leading-relaxed">
-                    Have a VIP / Friend Code (like <code className="text-amber-300 font-mono">DYLANVIP</code>)? Enter it above to unlock 100% Free Lifetime Access immediately!
+                  <p className="text-[11px] text-slate-400 leading-relaxed">
+                    Have an authorized access or promo code? Enter it above to apply your discount.
                   </p>
                 </div>
               )}

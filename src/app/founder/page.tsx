@@ -1395,8 +1395,7 @@ export default function FounderDashboardPage() {
               </h3>
               {Object.keys(metrics?.promoCodes || {}).length === 0 ? (
                 <div className="py-8 text-center text-slate-500 text-xs">
-                  No promo codes redeemed yet.
-                  <p className="text-[11px] text-slate-600 mt-1">Codes active: DYLANVIP, HOMIEPASS, STUDIO100</p>
+                  <p className="text-[11px] text-slate-500 mt-1 font-mono">Master VIP Pass: PLUGGED-VIP-DYLAN-8492-X9Q7</p>
                 </div>
               ) : (
                 <div className="space-y-3">

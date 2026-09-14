@@ -18,6 +18,7 @@ import {
   Copy,
   Check,
   RefreshCw,
+  Tag,
 } from 'lucide-react';
 
 interface MachineItem {
@@ -526,33 +527,33 @@ export default function AccountPage() {
             </div>
           </div>
 
-          {/* VIP Promo Code Redemption */}
-          <div className="glass-panel rounded-3xl p-6 sm:p-8 border border-amber-500/30 bg-gradient-to-r from-amber-500/10 via-transparent to-transparent space-y-4">
+          {/* Promo Code Redemption */}
+          <div className="glass-panel rounded-3xl p-6 sm:p-8 border border-white/10 space-y-4">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div>
-                <span className="text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40">
-                  REDEEM VIP PROMO CODE
+                <span className="text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-white/10 text-slate-300 border border-white/10">
+                  PROMO CODE
                 </span>
-                <h3 className="text-lg font-black text-white mt-2">Have a Founder or VIP Code?</h3>
+                <h3 className="text-lg font-black text-white mt-2">Redeem Code</h3>
                 <p className="text-xs text-slate-400">
-                  Enter your friend or promo code to immediately unlock 100% Free Lifetime VIP and 5 computer activations.
+                  Enter an authorized promo code to apply license upgrades to your account.
                 </p>
               </div>
 
               <form onSubmit={handleRedeemPromo} className="flex items-center space-x-2 w-full sm:w-auto">
                 <input
                   type="text"
-                  placeholder="e.g. PLUGGED-VIP-DYLAN-8492-X9Q7"
+                  placeholder="Enter code"
                   value={promoCode}
                   onChange={(e) => setPromoCode(e.target.value.toUpperCase())}
-                  className="px-4 py-2.5 rounded-xl bg-studio-950 border border-amber-500/30 text-amber-300 placeholder-slate-600 text-xs font-mono uppercase focus:outline-none focus:border-amber-400 min-w-[240px]"
+                  className="px-4 py-2.5 rounded-xl bg-studio-950 border border-white/10 text-white placeholder-slate-600 text-xs font-mono uppercase focus:outline-none focus:border-white/30 min-w-[220px]"
                 />
                 <button
                   type="submit"
                   disabled={redeemingPromo || !promoCode.trim()}
-                  className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-amber-400 to-amber-500 hover:brightness-110 text-black text-xs font-black transition-all disabled:opacity-50 whitespace-nowrap shadow-glow-amber"
+                  className="px-4 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-semibold transition-all disabled:opacity-50 whitespace-nowrap border border-white/10"
                 >
-                  {redeemingPromo ? 'Unlocking...' : 'Redeem Code'}
+                  {redeemingPromo ? 'Applying...' : 'Redeem'}
                 </button>
               </form>
             </div>
@@ -857,20 +858,19 @@ export default function AccountPage() {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-medium text-amber-300 mb-1.5 flex items-center justify-between">
+                  <label className="block text-xs font-medium text-slate-300 mb-1.5 flex items-center justify-between">
                     <span className="flex items-center space-x-1">
-                      <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-                      <span>VIP Promo / Friend Code (Optional)</span>
+                      <Tag className="w-3.5 h-3.5 text-slate-400" />
+                      <span>Promo Code (Optional)</span>
                     </span>
-                    <span className="text-[10px] text-emerald-400 font-bold">100% Free Lifetime Pass</span>
                   </label>
                   <div className="relative">
                     <input
                       type="text"
-                      placeholder="e.g. PLUGGED-VIP-DYLAN-8492-X9Q7"
+                      placeholder="Enter promo code"
                       value={promoCode}
                       onChange={(e) => setPromoCode(e.target.value.toUpperCase())}
-                      className="w-full px-4 py-3 rounded-xl bg-studio-900 border border-amber-500/40 text-amber-300 placeholder-slate-600 text-xs font-mono uppercase focus:outline-none focus:border-amber-400"
+                      className="w-full px-4 py-3 rounded-xl bg-studio-900 border border-white/10 text-white placeholder-slate-500 text-xs font-mono uppercase focus:outline-none focus:border-white/30"
                     />
                   </div>
                 </div>

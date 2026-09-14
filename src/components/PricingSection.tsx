@@ -257,28 +257,6 @@ export const PricingSection: React.FC = () => {
         </div>
       </div>
 
-      {/* VIP / Founder Promo Ribbon */}
-      <div className="mt-10 max-w-4xl mx-auto p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-amber-500/10 via-cyber-purple/10 to-emerald-500/10 border border-amber-500/30 flex flex-col sm:flex-row items-center justify-between gap-4 text-center sm:text-left">
-        <div className="flex items-center space-x-3">
-          <div className="w-10 h-10 rounded-xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center shrink-0">
-            <Sparkles className="w-5 h-5 text-amber-400" />
-          </div>
-          <div>
-            <span className="text-sm font-black text-white block">Have a VIP or Friend Access Code?</span>
-            <span className="text-xs text-slate-400 block">
-              Redeem your code for 100% Free Lifetime VIP Pass &amp; 5 computer activations.
-            </span>
-          </div>
-        </div>
-        <Link
-          href="/checkout"
-          className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-amber-400 to-amber-500 hover:brightness-110 text-black text-xs font-black transition-all shadow-glow-amber shrink-0 flex items-center space-x-1.5"
-        >
-          <span>Redeem VIP Code</span>
-          <ArrowRight className="w-3.5 h-3.5" />
-        </Link>
-      </div>
-
       {/* Slate Digital Style Complete Feature Comparison Table */}
       <div className="mt-16 max-w-5xl mx-auto rounded-3xl bg-studio-900/70 border border-white/10 p-6 sm:p-10">
         <div className="text-center max-w-2xl mx-auto mb-10">
