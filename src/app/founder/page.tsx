@@ -234,6 +234,24 @@ export default function FounderDashboardPage() {
     },
   ]);
   const [aiLoading, setAiLoading] = useState(false);
+  const isListeningRef = useRef(false);
+  const isSpeakingRef = useRef(false);
+  const aiLoadingRef = useRef(false);
+  const recognitionWatchdogTimerRef = useRef<any>(null);
+  const recognitionInstanceRef = useRef<any>(null);
+
+  useEffect(() => {
+    isSpeakingRef.current = isSpeaking;
+  }, [isSpeaking]);
+
+  useEffect(() => {
+    aiLoadingRef.current = aiLoading;
+  }, [aiLoading]);
+
+  useEffect(() => {
+    isListeningRef.current = isListening;
+  }, [isListening]);
+
   const [activeNavTab, setActiveNavTab] = useState<'studio' | 'social' | 'analytics'>('studio');
   const [attachedAudioFile, setAttachedAudioFile] = useState<File | null>(null);
   const [isUploadingAudio, setIsUploadingAudio] = useState(false);
@@ -507,15 +525,148 @@ export default function FounderDashboardPage() {
         } catch (_) {}
       }
     }
+    isSpeakingRef.current = false;
     setIsSpeaking(false);
+  }, []);
+
+  // Rock-Solid Speech Recognition Engine (Continuous Hands-Free + Autonomous Watchdog)
+  const stopListeningSession = useCallback(() => {
+    if (recognitionWatchdogTimerRef.current) {
+      clearTimeout(recognitionWatchdogTimerRef.current);
+      recognitionWatchdogTimerRef.current = null;
+    }
+    if (recognitionInstanceRef.current) {
+      try {
+        recognitionInstanceRef.current.abort();
+      } catch (_) {}
+      recognitionInstanceRef.current = null;
+    }
+    isListeningRef.current = false;
+    setIsListening(false);
+    setTranscriptPreview('');
+  }, []);
+
+  const startContinuousListening = useCallback(() => {
+    if (typeof window === 'undefined') return;
+    // Guard: Do not listen if Jarvis is currently speaking or waiting for AI answer
+    if (isSpeakingRef.current || aiLoadingRef.current) {
+      return;
+    }
+    if (isListeningRef.current && recognitionInstanceRef.current) {
+      return;
+    }
+
+    const SpeechRecognition =
+      (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+
+    if (!SpeechRecognition) {
+      return;
+    }
+
+    if (recognitionWatchdogTimerRef.current) {
+      clearTimeout(recognitionWatchdogTimerRef.current);
+      recognitionWatchdogTimerRef.current = null;
+    }
+
+    try {
+      if (recognitionInstanceRef.current) {
+        try {
+          recognitionInstanceRef.current.abort();
+        } catch (_) {}
+        recognitionInstanceRef.current = null;
+      }
+
+      const reco = new SpeechRecognition();
+      reco.continuous = true;
+      reco.interimResults = true;
+      reco.lang = 'en-US';
+      reco.maxAlternatives = 1;
+
+      reco.onstart = () => {
+        isListeningRef.current = true;
+        setIsListening(true);
+        setTranscriptPreview('');
+      };
+
+      reco.onresult = (event: any) => {
+        if (isSpeakingRef.current) return;
+
+        let interim = '';
+        let finalSpeech = '';
+
+        for (let i = event.resultIndex; i < event.results.length; ++i) {
+          const item = event.results[i];
+          if (item.isFinal) {
+            finalSpeech += item[0].transcript;
+          } else {
+            interim += item[0].transcript;
+          }
+        }
+
+        if (interim) {
+          setTranscriptPreview(interim);
+        }
+
+        if (finalSpeech.trim()) {
+          const query = finalSpeech.trim();
+          setTranscriptPreview('');
+          try {
+            reco.abort();
+          } catch (_) {}
+          recognitionInstanceRef.current = null;
+          isListeningRef.current = false;
+          setIsListening(false);
+          handleSendAiPromptRef.current(query);
+        }
+      };
+
+      reco.onerror = (event: any) => {
+        const err = event.error;
+        if (err === 'no-speech' || err === 'aborted') {
+          return;
+        }
+        if (err === 'not-allowed') {
+          isListeningRef.current = false;
+          setIsListening(false);
+          setActionMessage('⚠️ Microphone blocked. Tap browser settings to allow.');
+          setTimeout(() => setActionMessage(null), 5000);
+          return;
+        }
+        console.warn('SpeechRecognition warning:', err);
+      };
+
+      reco.onend = () => {
+        isListeningRef.current = false;
+        setIsListening(false);
+        recognitionInstanceRef.current = null;
+
+        // Autonomous resurrection watchdog: restart listening after silence decay
+        if (isContinuousModeRef.current && !isSpeakingRef.current && !aiLoadingRef.current) {
+          if (recognitionWatchdogTimerRef.current) clearTimeout(recognitionWatchdogTimerRef.current);
+          recognitionWatchdogTimerRef.current = setTimeout(() => {
+            if (isContinuousModeRef.current && !isSpeakingRef.current && !aiLoadingRef.current) {
+              startContinuousListening();
+            }
+          }, 250);
+        }
+      };
+
+      recognitionInstanceRef.current = reco;
+      reco.start();
+    } catch (err: any) {
+      console.warn('Could not launch speech recognition:', err);
+      isListeningRef.current = false;
+      setIsListening(false);
+    }
   }, []);
 
 // Rock-Solid Single-Channel Voice Engine (Web Audio Primary + Reused Element Fallback)
   const speakJarvisVoice = useCallback((textToSpeak: string) => {
     if (isVoiceMuted || !isVoiceEnabled || typeof window === 'undefined') return;
 
-    // Immediately stop any lingering audio before starting new voice
+    // Immediately stop any lingering audio and mute mic so it never records Jarvis's own voice
     stopAllVoicePlayback();
+    stopListeningSession();
 
     const cleanText = textToSpeak
       .replace(/\[[A-Z_]+\]/g, '') // strip brackets
@@ -532,6 +683,7 @@ export default function FounderDashboardPage() {
 
     setLatestSpeech(cleanText);
     const thisGenId = ++speechGenIdRef.current;
+    isSpeakingRef.current = true;
     setIsSpeaking(true);
 
     // 1. Primary: High-fidelity Web Audio API Stream (bypasses mobile silent switch & autoplay blocks)
@@ -692,101 +844,30 @@ export default function FounderDashboardPage() {
   }, [pin, speakJarvisVoice]);
 
 
-  // Robust Dynamic Speech Recognition (Tap-to-Talk & Instant Interrupt)
-  const toggleMic = async () => {
+  // Robust Dynamic Speech Recognition (Tap-to-Talk, Instant Interrupt & Hands-Free Toggle)
+  const toggleMic = useCallback(async () => {
     triggerHaptic(25);
 
-    // 1. If Jarvis is currently speaking, tapping the button acts as an INSTANT INTERRUPT!
-    if (isSpeaking) {
+    // 1. If Jarvis is currently speaking, tapping acts as an INSTANT INTERRUPT!
+    if (isSpeakingRef.current) {
       stopAllVoicePlayback();
+      setTimeout(() => {
+        startContinuousListening();
+      }, 200);
       return;
     }
 
     // 2. If already listening, stop recording
-    if (isListening) {
-      if (recognitionRef.current) {
-        try {
-          recognitionRef.current.stop();
-        } catch (_) {}
-      }
-      setIsListening(false);
+    if (isListeningRef.current) {
+      stopListeningSession();
       return;
     }
 
-    // 3. Guarantee all previous sound is 100% silenced so mic never hears speaker loopback
+    // 3. Guarantee media permissions are unlocked and launch continuous listening loop
     stopAllVoicePlayback();
     unlockAudioOnTouch();
-
-    const SpeechRecognition =
-      (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-
-    if (!SpeechRecognition) {
-      // In iOS Safari PWA standalone mode where Apple disables webkitSpeechRecognition:
-      setDictationModalOpen(true);
-      return;
-    }
-
-    try {
-      // 50ms buffer to allow phone speaker hardware to completely mute
-      await new Promise((r) => setTimeout(r, 50));
-
-      if (recognitionRef.current) {
-        try {
-          recognitionRef.current.abort();
-        } catch (_) {}
-      }
-
-      const reco = new SpeechRecognition();
-      reco.continuous = false;
-      reco.interimResults = true;
-      reco.lang = 'en-US';
-
-      reco.onstart = () => {
-        setIsListening(true);
-        setTranscriptPreview('');
-        triggerHaptic([10, 30]);
-      };
-
-      reco.onresult = (event: any) => {
-        let currentTranscript = '';
-        for (let i = event.resultIndex; i < event.results.length; ++i) {
-          currentTranscript += event.results[i][0].transcript;
-        }
-        setTranscriptPreview(currentTranscript);
-        if (event.results[event.results.length - 1]?.isFinal) {
-          const finalPrompt = currentTranscript.trim();
-          setIsListening(false);
-          setTranscriptPreview('');
-          if (finalPrompt) {
-            handleSendAiPromptRef.current(finalPrompt);
-          }
-        }
-      };
-
-      reco.onerror = (event: any) => {
-        console.warn('SpeechRecognition error:', event.error);
-        setIsListening(false);
-        setTranscriptPreview('');
-        if (event.error === 'not-allowed') {
-          setActionMessage('⚠️ Microphone blocked. Tap Settings to enable.');
-          setTimeout(() => setActionMessage(null), 6000);
-        } else if (event.error !== 'no-speech') {
-          setDictationModalOpen(true);
-        }
-      };
-
-      reco.onend = () => {
-        setIsListening(false);
-      };
-
-      recognitionRef.current = reco;
-      reco.start();
-    } catch (err: any) {
-      console.warn('Could not start speech recognition:', err);
-      setIsListening(false);
-      setDictationModalOpen(true);
-    }
-  };
+    startContinuousListening();
+  }, [stopAllVoicePlayback, unlockAudioOnTouch, startContinuousListening, stopListeningSession]);
 
   const fetchMetrics = useCallback(async (selectedTimeframe = timeframe, pinCode = pin) => {
     setLoading(true);
@@ -1175,6 +1256,7 @@ export default function FounderDashboardPage() {
       speakJarvisVoice(errMsg);
     } finally {
       setAiLoading(false);
+      aiLoadingRef.current = false;
       setTimeout(() => {
         chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' });
       }, 100);
@@ -1187,15 +1269,35 @@ export default function FounderDashboardPage() {
 
   useEffect(() => {
     triggerAutoListenRef.current = () => {
-      if (!isSpeaking && isContinuousModeRef.current) {
-        setTimeout(() => {
-          if (!isSpeaking && isContinuousModeRef.current) {
-            toggleMic();
+      if (!isSpeakingRef.current && isContinuousModeRef.current && !aiLoadingRef.current) {
+        if (recognitionWatchdogTimerRef.current) clearTimeout(recognitionWatchdogTimerRef.current);
+        recognitionWatchdogTimerRef.current = setTimeout(() => {
+          if (!isSpeakingRef.current && isContinuousModeRef.current && !aiLoadingRef.current) {
+            startContinuousListening();
           }
         }, 350);
       }
     };
-  });
+  }, [startContinuousListening]);
+
+  // Re-arm speech recognition and resume Web Audio when tab regains focus/visibility
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible' && isAuthenticated) {
+        if (webAudioCtxRef.current && webAudioCtxRef.current.state === 'suspended') {
+          webAudioCtxRef.current.resume().catch(() => {});
+        }
+        if (isContinuousModeRef.current && !isSpeakingRef.current && !aiLoadingRef.current && !isListeningRef.current) {
+          startContinuousListening();
+        }
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [isAuthenticated, startContinuousListening]);
 
 
   // PIN SHIELD VIEW
@@ -1669,8 +1771,10 @@ export default function FounderDashboardPage() {
                     triggerHaptic(15);
                     const next = !isContinuousMode;
                     setIsContinuousMode(next);
-                    if (next && !isListening && !isSpeaking) {
-                      toggleMic();
+                    if (next) {
+                      startContinuousListening();
+                    } else {
+                      stopListeningSession();
                     }
                   }}
                   className={`px-3 py-1.5 rounded-xl border text-xs font-bold transition-all flex items-center space-x-1.5 shadow-sm active:scale-95 ${
@@ -3207,7 +3311,15 @@ export default function FounderDashboardPage() {
         onToggleMic={toggleMic}
         onToggleContinuous={() => {
           triggerHaptic(15);
-          setIsContinuousMode((prev) => !prev);
+          setIsContinuousMode((prev) => {
+            const next = !prev;
+            if (next) {
+              startContinuousListening();
+            } else {
+              stopListeningSession();
+            }
+            return next;
+          });
         }}
         onToggleMute={toggleGlobalMute}
         onStopSpeech={stopAllVoicePlayback}

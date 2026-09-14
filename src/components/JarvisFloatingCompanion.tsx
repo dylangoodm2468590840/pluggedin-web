@@ -39,6 +39,7 @@ export default function JarvisFloatingCompanion({
   onToggleMic,
   onToggleContinuous,
   onToggleMute,
+  onStopSpeech,
   onSendCommand,
   onUnlockAudio,
   spotlightTarget,
@@ -48,6 +49,9 @@ export default function JarvisFloatingCompanion({
   const [hasUnlockedAudio, setHasUnlockedAudio] = useState(false);
   const [position, setPosition] = useState<{ x: number; y: number }>({ x: 20, y: 120 });
   const [isDragging, setIsDragging] = useState(false);
+  const [showAutoBubble, setShowAutoBubble] = useState(true);
+  const [activeBubbleText, setActiveBubbleText] = useState(latestSpeech || '');
+  const bubbleTimeoutRef = useRef<any>(null);
   const dragStartRef = useRef<{ startX: number; startY: number; posX: number; posY: number }>({
     startX: 0,
     startY: 0,
@@ -55,6 +59,32 @@ export default function JarvisFloatingCompanion({
     posY: 120,
   });
   const hasMovedRef = useRef(false);
+
+  // Auto-reveal speech bubble when JARVIS speaks or Dylan speaks, auto-fade after 7s
+  useEffect(() => {
+    if (latestSpeech) {
+      setActiveBubbleText(latestSpeech);
+      setShowAutoBubble(true);
+      if (bubbleTimeoutRef.current) clearTimeout(bubbleTimeoutRef.current);
+      if (!isSpeaking) {
+        bubbleTimeoutRef.current = setTimeout(() => {
+          setShowAutoBubble(false);
+        }, 7500);
+      }
+    }
+  }, [latestSpeech, isSpeaking]);
+
+  useEffect(() => {
+    if (isSpeaking || isThinking || transcriptPreview) {
+      setShowAutoBubble(true);
+      if (bubbleTimeoutRef.current) clearTimeout(bubbleTimeoutRef.current);
+    } else if (!isSpeaking && activeBubbleText) {
+      if (bubbleTimeoutRef.current) clearTimeout(bubbleTimeoutRef.current);
+      bubbleTimeoutRef.current = setTimeout(() => {
+        setShowAutoBubble(false);
+      }, 7500);
+    }
+  }, [isSpeaking, isThinking, transcriptPreview, activeBubbleText]);
 
   // Initialize position to bottom-right corner on mount
   useEffect(() => {
@@ -87,7 +117,7 @@ export default function JarvisFloatingCompanion({
     const touch = e.touches[0];
     const dx = touch.clientX - dragStartRef.current.startX;
     const dy = touch.clientY - dragStartRef.current.startY;
-    if (Math.abs(dx) > 5 || Math.abs(dy) > 5) {
+    if (Math.abs(dx) > 12 || Math.abs(dy) > 12) {
       hasMovedRef.current = true;
     }
     const maxX = typeof window !== 'undefined' ? window.innerWidth - 80 : 300;
@@ -118,7 +148,7 @@ export default function JarvisFloatingCompanion({
     const onMouseMove = (moveEvent: MouseEvent) => {
       const dx = moveEvent.clientX - dragStartRef.current.startX;
       const dy = moveEvent.clientY - dragStartRef.current.startY;
-      if (Math.abs(dx) > 5 || Math.abs(dy) > 5) {
+      if (Math.abs(dx) > 12 || Math.abs(dy) > 12) {
         hasMovedRef.current = true;
       }
       const maxX = window.innerWidth - 90;
@@ -156,6 +186,9 @@ export default function JarvisFloatingCompanion({
     ? 'speaking'
     : 'idle';
 
+  const isNearTopEdge = position.y < 220;
+  const isNearRightEdge = typeof window !== 'undefined' ? position.x > (window.innerWidth * 0.55) : true;
+
   return (
     <div
       style={{
@@ -167,6 +200,102 @@ export default function JarvisFloatingCompanion({
       }}
       className="select-none transition-transform duration-75"
     >
+      {/* AUTOMATIC HOLOGRAPHIC SPEECH BUBBLE (Hands-Free Zero-Tap Live Subtitles & Status) */}
+      {!isExpanded && showAutoBubble && (activeBubbleText || transcriptPreview || isThinking) && (
+        <div
+          className={`absolute ${isNearTopEdge ? 'top-full mt-3' : 'bottom-full mb-3'} ${
+            isNearRightEdge ? 'right-0' : 'left-0'
+          } w-72 sm:w-80 max-w-[calc(100vw-32px)] bg-slate-950/95 border border-cyan-500/40 rounded-2xl p-3.5 shadow-[0_0_35px_rgba(0,240,255,0.3)] backdrop-blur-2xl text-white space-y-2 z-50 animate-in fade-in zoom-in-95 duration-200 pointer-events-auto`}
+        >
+          {/* Holographic Speech Bubble Tail */}
+          <div
+            className={`absolute w-3 h-3 bg-slate-950 border-cyan-500/40 transform rotate-45 ${
+              isNearTopEdge
+                ? `-top-1.5 ${isNearRightEdge ? 'right-6 border-t border-l' : 'left-6 border-t border-l'}`
+                : `-bottom-1.5 ${isNearRightEdge ? 'right-6 border-b border-r' : 'left-6 border-b border-r'}`
+            }`}
+          />
+
+          {/* Header Bar */}
+          <div className="flex items-center justify-between pb-1.5 border-b border-slate-800 text-[11px] font-mono">
+            <div className="flex items-center space-x-1.5">
+              <span
+                className={`w-2 h-2 rounded-full ${
+                  isThinking
+                    ? 'bg-amber-400 animate-ping'
+                    : transcriptPreview
+                    ? 'bg-rose-400 animate-ping'
+                    : isSpeaking
+                    ? 'bg-purple-400 animate-pulse'
+                    : 'bg-cyan-400'
+                }`}
+              />
+              <span className="font-bold tracking-wider text-cyan-300">
+                {isThinking
+                  ? 'J.A.R.V.I.S. THINKING...'
+                  : transcriptPreview
+                  ? 'HEARING DYLAN'
+                  : isSpeaking
+                  ? 'J.A.R.V.I.S. SPEAKING'
+                  : 'J.A.R.V.I.S.'}
+              </span>
+            </div>
+            <div className="flex items-center space-x-1.5">
+              {isSpeaking && onStopSpeech && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onStopSpeech();
+                  }}
+                  className="text-[10px] px-1.5 py-0.5 rounded bg-rose-500/20 text-rose-300 border border-rose-500/40 hover:bg-rose-500/30 transition-colors"
+                >
+                  Mute
+                </button>
+              )}
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowAutoBubble(false);
+                }}
+                className="text-slate-400 hover:text-white p-0.5 rounded transition-colors"
+                title="Dismiss bubble"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          </div>
+
+          {/* Subtitle / Spoken Transcript Content */}
+          <div className="text-xs leading-relaxed max-h-36 overflow-y-auto">
+            {transcriptPreview ? (
+              <div className="space-y-1">
+                <p className="text-slate-400 text-[10px] font-mono uppercase tracking-wider">Hearing live:</p>
+                <p className="text-cyan-300 font-mono italic animate-pulse">
+                  &ldquo;{transcriptPreview}&rdquo;
+                </p>
+              </div>
+            ) : isThinking ? (
+              <div className="flex items-center space-x-2 py-1 text-amber-300 font-mono text-[11px]">
+                <Sparkles className="w-3.5 h-3.5 animate-spin text-amber-400" />
+                <span>Formulating response...</span>
+              </div>
+            ) : (
+              <p className="text-slate-100 font-sans leading-relaxed">
+                &ldquo;{activeBubbleText}&rdquo;
+              </p>
+            )}
+          </div>
+
+          {/* Bottom Telemetry Status */}
+          <div className="flex items-center justify-between text-[9px] font-mono text-slate-500 pt-1 border-t border-slate-800/60">
+            <span className={isContinuousMode ? 'text-cyan-400' : 'text-slate-500'}>
+              {isContinuousMode ? '⚡ Hands-free continuous' : 'Touch core to talk'}
+            </span>
+            <span className="text-slate-400">Tap robot to expand</span>
+          </div>
+        </div>
+      )}
+
       {/* EXPANDED HOLOGRAPHIC HUD FLYOUT PILL */}
       {isExpanded && (
         <div className="absolute bottom-20 right-0 sm:right-auto sm:left-0 w-72 sm:w-84 bg-slate-950/95 border border-cyan-500/30 rounded-3xl p-4 shadow-[0_0_40px_rgba(0,240,255,0.25)] backdrop-blur-2xl text-white space-y-3 z-50 animate-in fade-in zoom-in-95 duration-200">
