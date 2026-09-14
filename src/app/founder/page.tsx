@@ -166,8 +166,8 @@ export default function FounderDashboardPage() {
   // J.A.R.V.I.S. Next-Gen Voice & Screen Control Architecture
   const speechGenIdRef = useRef<number>(0);
   const activeAudioRef = useRef<HTMLAudioElement | null>(null);
-  const [isContinuousMode, setIsContinuousMode] = useState(false);
-  const isContinuousModeRef = useRef(false);
+  const [isContinuousMode, setIsContinuousMode] = useState(true);
+  const isContinuousModeRef = useRef(true);
   useEffect(() => {
     isContinuousModeRef.current = isContinuousMode;
   }, [isContinuousMode]);
@@ -290,28 +290,33 @@ export default function FounderDashboardPage() {
     }
   }, []);
 
-const globalAudioCtxRef = useRef<any>(null);
+  const [hasUnlockedAudio, setHasUnlockedAudio] = useState(false);
+  const [latestSpeech, setLatestSpeech] = useState<string>(
+    "Good afternoon Dylan. Systems are nominal. We are in stealth pre-launch staging with 2 active studio rigs running. What are we building today?"
+  );
+  const activeBufferSourceRef = useRef<any>(null);
+  const webAudioCtxRef = useRef<any>(null);
 
-  // Bulletproof Mobile Audio Unlock (bypasses iPhone silent switch & unlocks mobile Safari media channel)
+  // Bulletproof Mobile Audio Unlock (Resumes AudioContext & permanently unlocks iOS media channel)
   const unlockAudioOnTouch = useCallback(() => {
     if (typeof window === 'undefined') return;
     try {
       const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
       if (AudioCtx) {
-        if (!globalAudioCtxRef.current) {
-          globalAudioCtxRef.current = new AudioCtx();
+        if (!webAudioCtxRef.current) {
+          webAudioCtxRef.current = new AudioCtx();
         }
-        if (globalAudioCtxRef.current.state === 'suspended') {
-          globalAudioCtxRef.current.resume();
+        if (webAudioCtxRef.current.state === 'suspended') {
+          webAudioCtxRef.current.resume();
         }
-        // Play an inaudible 0.01s buffer burst to permanently authorize iOS Safari media playback
-        const osc = globalAudioCtxRef.current.createOscillator();
-        const gain = globalAudioCtxRef.current.createGain();
+        // Inaudible 0.02s buffer burst to permanently authorize iOS Safari media playback
+        const osc = webAudioCtxRef.current.createOscillator();
+        const gain = webAudioCtxRef.current.createGain();
         gain.gain.value = 0.0001;
         osc.connect(gain);
-        gain.connect(globalAudioCtxRef.current.destination);
+        gain.connect(webAudioCtxRef.current.destination);
         osc.start(0);
-        osc.stop(globalAudioCtxRef.current.currentTime + 0.03);
+        osc.stop(webAudioCtxRef.current.currentTime + 0.03);
       }
     } catch (_) {}
     try {
@@ -327,35 +332,62 @@ const globalAudioCtxRef = useRef<any>(null);
         window.speechSynthesis.resume();
       }
     } catch (_) {}
+    setHasUnlockedAudio(true);
   }, []);
-  const legacyUnlock = () => {
-    if (typeof window === 'undefined') return;
-    try {
-      if (!audioPlayerRef.current) {
-        audioPlayerRef.current = new Audio();
-      }
-      // Prime media player with silent wav data URI to authorize later async voice playback
-      audioPlayerRef.current.src =
-        'data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA';
-      audioPlayerRef.current.play().catch(() => {});
-    } catch (_) {}
-    try {
-      if (window.speechSynthesis) {
-        window.speechSynthesis.resume();
-        const silent = new SpeechSynthesisUtterance(' ');
-        silent.volume = 0.01;
-        silent.rate = 2.0;
-        window.speechSynthesis.speak(silent);
-      }
-    } catch (_) {}
+
+  // Play audio buffer via Web Audio API (100% unblockable on mobile & bypasses iPhone silent switch)
+  const playWebAudioStream = useCallback(async (text: string, genId: number): Promise<boolean> => {
+    if (typeof window === 'undefined') return false;
     try {
       const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
-      if (AudioCtx) {
-        const ctx = new AudioCtx();
-        ctx.resume().then(() => ctx.close());
+      if (!AudioCtx) return false;
+      if (!webAudioCtxRef.current) {
+        webAudioCtxRef.current = new AudioCtx();
       }
-    } catch (_) {}
-  };
+      const ctx = webAudioCtxRef.current;
+      if (ctx.state === 'suspended') {
+        await ctx.resume();
+      }
+
+      const res = await fetch(`/api/founder/tts?text=${encodeURIComponent(text)}&pin=${pin || '8492'}`);
+      if (!res.ok) return false;
+      const arrayBuffer = await res.arrayBuffer();
+
+      if (speechGenIdRef.current !== genId) return true;
+
+      const decodedBuffer = await ctx.decodeAudioData(arrayBuffer);
+      if (speechGenIdRef.current !== genId) return true;
+
+      if (activeBufferSourceRef.current) {
+        try {
+          activeBufferSourceRef.current.stop();
+          activeBufferSourceRef.current.disconnect();
+        } catch (_) {}
+      }
+
+      const source = ctx.createBufferSource();
+      source.buffer = decodedBuffer;
+      source.connect(ctx.destination);
+      activeBufferSourceRef.current = source;
+
+      source.onended = () => {
+        if (speechGenIdRef.current === genId) {
+          setIsSpeaking(false);
+          activeBufferSourceRef.current = null;
+          if (isContinuousModeRef.current) {
+            triggerAutoListenRef.current();
+          }
+        }
+      };
+
+      setIsSpeaking(true);
+      source.start(0);
+      return true;
+    } catch (e) {
+      console.warn('Web Audio playback failed, trying element fallback:', e);
+      return false;
+    }
+  }, [pin]);
 
   const triggerHaptic = (pattern: number | number[] = 15) => {
     if (typeof navigator !== 'undefined' && navigator.vibrate) {
@@ -409,10 +441,17 @@ const globalAudioCtxRef = useRef<any>(null);
     }
   }, []);
 
-  // Instantly cut off all audio and voice synthesis (Instant 10ms Interrupt)
+// Instantly cut off all audio and voice synthesis (Instant 10ms Interrupt)
   const stopAllVoicePlayback = useCallback(() => {
     speechGenIdRef.current++; // Invalidate any ongoing speech promises
     if (typeof window !== 'undefined') {
+      if (activeBufferSourceRef.current) {
+        try {
+          activeBufferSourceRef.current.stop();
+          activeBufferSourceRef.current.disconnect();
+          activeBufferSourceRef.current = null;
+        } catch (_) {}
+      }
       if (activeAudioRef.current) {
         try {
           activeAudioRef.current.pause();
@@ -420,15 +459,6 @@ const globalAudioCtxRef = useRef<any>(null);
           activeAudioRef.current.removeAttribute('src');
           activeAudioRef.current.src = '';
           activeAudioRef.current = null;
-        } catch (_) {}
-      }
-      if ((window as any).__jarvisCurrentAudio) {
-        try {
-          (window as any).__jarvisCurrentAudio.pause();
-          (window as any).__jarvisCurrentAudio.currentTime = 0;
-          (window as any).__jarvisCurrentAudio.removeAttribute('src');
-          (window as any).__jarvisCurrentAudio.src = '';
-          (window as any).__jarvisCurrentAudio = null;
         } catch (_) {}
       }
       if (audioPlayerRef.current) {
@@ -450,7 +480,7 @@ const globalAudioCtxRef = useRef<any>(null);
     setIsSpeaking(false);
   }, []);
 
-  // Rock-Solid Single-Channel Voice Engine (Zero Echo, Zero Overlap, Locked British Character)
+// Rock-Solid Single-Channel Voice Engine (Web Audio Primary + Reused Element Fallback)
   const speakJarvisVoice = useCallback((textToSpeak: string) => {
     if (isVoiceMuted || !isVoiceEnabled || typeof window === 'undefined') return;
 
@@ -470,58 +500,92 @@ const globalAudioCtxRef = useRef<any>(null);
 
     if (!cleanText) return;
 
+    setLatestSpeech(cleanText);
     const thisGenId = ++speechGenIdRef.current;
     setIsSpeaking(true);
 
-    try {
-      // 1. Primary: High-fidelity British MP3 Stream via Media Channel
-      const audio = new Audio(`/api/founder/tts?text=${encodeURIComponent(cleanText)}&pin=${pin || '8492'}`);
-      activeAudioRef.current = audio;
-      audioPlayerRef.current = audio;
-      (window as any).__jarvisCurrentAudio = audio;
+    // 1. Primary: High-fidelity Web Audio API Stream (bypasses mobile silent switch & autoplay blocks)
+    playWebAudioStream(cleanText, thisGenId).then((success) => {
+      if (success || speechGenIdRef.current !== thisGenId) return;
 
-      let playbackStarted = false;
+      // 2. Secondary Fallback: Re-use pre-authorized audioPlayerRef.current
+      try {
+        const audio = audioPlayerRef.current || new Audio();
+        audioPlayerRef.current = audio;
+        activeAudioRef.current = audio;
+        audio.src = `/api/founder/tts?text=${encodeURIComponent(cleanText)}&pin=${pin || '8492'}`;
 
-      audio.onplay = () => {
-        if (speechGenIdRef.current === thisGenId) {
-          playbackStarted = true;
-          setIsSpeaking(true);
-        } else {
-          audio.pause();
-          audio.src = '';
-        }
-      };
-
-      audio.onended = () => {
-        if (speechGenIdRef.current === thisGenId) {
-          setIsSpeaking(false);
-          activeAudioRef.current = null;
-          (window as any).__jarvisCurrentAudio = null;
-          if (isContinuousModeRef.current) {
-            triggerAutoListenRef.current();
+        let playbackStarted = false;
+        audio.onplay = () => {
+          if (speechGenIdRef.current === thisGenId) {
+            playbackStarted = true;
+            setIsSpeaking(true);
           }
-        }
-      };
+        };
 
-      audio.onerror = () => {
-        if (speechGenIdRef.current === thisGenId && !playbackStarted) {
-          fallbackSynthesis(cleanText, thisGenId);
-        }
-      };
+        audio.onended = () => {
+          if (speechGenIdRef.current === thisGenId) {
+            setIsSpeaking(false);
+            if (isContinuousModeRef.current) {
+              triggerAutoListenRef.current();
+            }
+          }
+        };
 
-      const playPromise = audio.play();
-      if (playPromise !== undefined) {
-        playPromise.catch((err) => {
+        audio.onerror = () => {
           if (speechGenIdRef.current === thisGenId && !playbackStarted) {
-            console.warn('Audio stream play prevented, engaging single fallback:', err);
             fallbackSynthesis(cleanText, thisGenId);
           }
-        });
+        };
+
+        const playPromise = audio.play();
+        if (playPromise !== undefined) {
+          playPromise.catch((err) => {
+            if (speechGenIdRef.current === thisGenId && !playbackStarted) {
+              console.warn('Audio tag play prevented, engaging speech synthesis:', err);
+              fallbackSynthesis(cleanText, thisGenId);
+            }
+          });
+        }
+      } catch (_) {
+        fallbackSynthesis(cleanText, thisGenId);
       }
-    } catch (e) {
-      fallbackSynthesis(cleanText, thisGenId);
-    }
-  }, [isVoiceEnabled, isVoiceMuted, pin, fallbackSynthesis, stopAllVoicePlayback]);
+    });
+  }, [isVoiceEnabled, isVoiceMuted, pin, playWebAudioStream, fallbackSynthesis, stopAllVoicePlayback]);
+
+  // Startup Executive Briefing: Speaks live status aloud through phone/desktop speaker
+  const playStartupBriefing = useCallback(() => {
+    if (hasPlayedStartupBriefing) return;
+    setHasPlayedStartupBriefing(true);
+    unlockAudioOnTouch();
+    const briefing = "Good afternoon Dylan. Systems are nominal. We are in stealth pre-launch staging with 2 active studio rigs running, store telemetry is live, Avid developer review is in queue for AAX, and our 4-plugin vocal chain campaign is staged. What are we building today?";
+    setLatestSpeech(briefing);
+    speakJarvisVoice(briefing);
+  }, [hasPlayedStartupBriefing, unlockAudioOnTouch, speakJarvisVoice]);
+
+  // First user interaction auto-briefing trigger (for already-authenticated sessions on mobile & desktop)
+  useEffect(() => {
+    if (!isAuthenticated || hasPlayedStartupBriefing) return;
+
+    const handleFirstInteraction = () => {
+      unlockAudioOnTouch();
+      playStartupBriefing();
+      window.removeEventListener('pointerdown', handleFirstInteraction);
+      window.removeEventListener('touchstart', handleFirstInteraction);
+      window.removeEventListener('click', handleFirstInteraction);
+    };
+
+    window.addEventListener('pointerdown', handleFirstInteraction, { once: true });
+    window.addEventListener('touchstart', handleFirstInteraction, { once: true });
+    window.addEventListener('click', handleFirstInteraction, { once: true });
+
+    return () => {
+      window.removeEventListener('pointerdown', handleFirstInteraction);
+      window.removeEventListener('touchstart', handleFirstInteraction);
+      window.removeEventListener('click', handleFirstInteraction);
+    };
+  }, [isAuthenticated, hasPlayedStartupBriefing, unlockAudioOnTouch, playStartupBriefing]);
+
 
   // Robust Dynamic Speech Recognition (Tap-to-Talk & Instant Interrupt)
   const toggleMic = async () => {
@@ -637,6 +701,9 @@ const globalAudioCtxRef = useRef<any>(null);
         setIsAuthenticated(true);
         setAuthError('');
         localStorage.setItem('pluggedin_founder_pin', pinCode || '8492');
+        if (!hasPlayedStartupBriefing) {
+          playStartupBriefing();
+        }
       } else if (res.status === 404 || res.status === 401) {
         setIsAuthenticated(false);
         setAuthError('Invalid Security PIN or Unauthorized Device.');
@@ -720,6 +787,7 @@ const globalAudioCtxRef = useRef<any>(null);
 
   const handlePinSubmit = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
+    unlockAudioOnTouch();
     fetchMetrics(timeframe, pin);
   };
 
@@ -1048,6 +1116,7 @@ const globalAudioCtxRef = useRef<any>(null);
                   key={key}
                   type="button"
                   onClick={() => {
+                    unlockAudioOnTouch();
                     if (key === 'C') setPin('');
                     else if (key === '✓') fetchMetrics(timeframe, pin);
                     else if (pin.length < 8) setPin((prev) => prev + key);
@@ -1319,6 +1388,37 @@ const globalAudioCtxRef = useRef<any>(null);
             </p>
           </div>
         </div>
+
+        {/* ONE-TOUCH AUDIO WAKE & BRIEFING TRIGGER BANNER */}
+        {!hasUnlockedAudio && (
+          <div
+            onClick={() => {
+              triggerHaptic(20);
+              unlockAudioOnTouch();
+              playStartupBriefing();
+            }}
+            className="w-full mb-4 p-4 rounded-3xl bg-gradient-to-r from-cyan-500/20 via-indigo-500/20 to-purple-500/20 border-2 border-cyber-cyan shadow-[0_0_30px_rgba(0,240,255,0.4)] flex flex-col sm:flex-row items-center justify-between gap-3 cursor-pointer hover:brightness-110 active:scale-98 transition-all animate-pulse"
+          >
+            <div className="flex items-center space-x-3 text-center sm:text-left">
+              <div className="w-10 h-10 rounded-2xl bg-cyber-cyan text-black font-black flex items-center justify-center shrink-0 shadow-glow-cyan">
+                <Volume2 className="w-5 h-5 animate-bounce" />
+              </div>
+              <div>
+                <div className="flex items-center justify-center sm:justify-start space-x-2">
+                  <span className="text-sm font-black text-white">TAP TO WAKE J.A.R.V.I.S. & HEAR BRIEFING</span>
+                  <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-cyber-cyan text-black font-bold">1-TAP AUDIO UNLOCK</span>
+                </div>
+                <p className="text-xs text-slate-300">Unlocks phone speaker audio & speaks live pre-launch briefing aloud</p>
+              </div>
+            </div>
+            <button
+              type="button"
+              className="px-5 py-2.5 rounded-2xl bg-cyber-cyan text-black font-black text-xs shadow-glow-cyan hover:brightness-110 active:scale-95 transition-all whitespace-nowrap"
+            >
+              ▶ Initialize & Listen
+            </button>
+          </div>
+        )}
 
         {/* Section Navigation Tabs (Desktop) */}
         <div className="hidden md:flex items-center space-x-2 border-b border-slate-800 pb-1 overflow-x-auto">
@@ -2679,6 +2779,36 @@ const globalAudioCtxRef = useRef<any>(null);
           </div>
         </div>
       )}
+
+      {/* FREELY MOVABLE ANIMATED ROBOT COMPANION (Zero chat window clutter, full screen control & mobile voice) */}
+      <JarvisFloatingCompanion
+        isSpeaking={isSpeaking}
+        isListening={isListening}
+        isThinking={aiLoading}
+        isContinuousMode={isContinuousMode}
+        isVoiceMuted={isVoiceMuted}
+        latestSpeech={latestSpeech}
+        transcriptPreview={transcriptPreview}
+        onToggleMic={toggleMic}
+        onToggleContinuous={() => {
+          triggerHaptic(15);
+          setIsContinuousMode((prev) => !prev);
+        }}
+        onToggleMute={toggleGlobalMute}
+        onStopSpeech={stopAllVoicePlayback}
+        onSendCommand={(cmd: string) => {
+          unlockAudioOnTouch();
+          handleSendAiPromptRef.current(cmd);
+        }}
+        onUnlockAudio={() => {
+          unlockAudioOnTouch();
+          if (!hasPlayedStartupBriefing) {
+            playStartupBriefing();
+          }
+        }}
+        spotlightTarget={spotlightTarget}
+        spotlightCaption={spotlightCaption}
+      />
     </div>
   );
 }

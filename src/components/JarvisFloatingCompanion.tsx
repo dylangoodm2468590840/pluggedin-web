@@ -67,6 +67,10 @@ export default function JarvisFloatingCompanion({
 
   // Handle Dragging (Mouse & Touch for Mobile)
   const handleTouchStart = (e: React.TouchEvent) => {
+    if (!hasUnlockedAudio) {
+      onUnlockAudio();
+      setHasUnlockedAudio(true);
+    }
     const touch = e.touches[0];
     dragStartRef.current = {
       startX: touch.clientX,
@@ -98,6 +102,10 @@ export default function JarvisFloatingCompanion({
   };
 
   const handleMouseDown = (e: React.MouseEvent) => {
+    if (!hasUnlockedAudio) {
+      onUnlockAudio();
+      setHasUnlockedAudio(true);
+    }
     dragStartRef.current = {
       startX: e.clientX,
       startY: e.clientY,
@@ -269,6 +277,8 @@ export default function JarvisFloatingCompanion({
             </span>
             <div className="grid grid-cols-2 gap-1.5">
               {[
+                { label: '📢 Briefing', cmd: 'Jarvis, give me the full executive pre-launch briefing and system status.' },
+                { label: '🔊 Test Sound', cmd: 'Jarvis, test phone audio speaker output and confirm audio is clear.' },
                 { label: '📊 Net Sales', cmd: 'Jarvis, show me our sales and isolate net profit numbers.' },
                 { label: '💻 Studio Rigs', cmd: 'Jarvis, show me my studio computers and active DAW rigs.' },
                 { label: '📱 Social Queue', cmd: 'Jarvis, pull up the social media queue and marketing center.' },
