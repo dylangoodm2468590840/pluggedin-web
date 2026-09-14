@@ -46,6 +46,7 @@ import {
 import JarvisPresentationCanvas, { JarvisPresentationDeck } from '@/components/JarvisPresentationCanvas';
 import JarvisVideoAdStudio, { JarvisVideoAd } from '@/components/JarvisVideoAdStudio';
 import JarvisPluginLab, { PluginSpec } from '@/components/JarvisPluginLab';
+import JarvisFloatingCompanion from '@/components/JarvisFloatingCompanion';
 import SocialCommandCenter from '@/components/SocialCommandCenter';
 import { Paperclip, Plus, History, Share2 } from 'lucide-react';
 
@@ -289,8 +290,45 @@ export default function FounderDashboardPage() {
     }
   }, []);
 
-  // Unlock audio & haptics for iOS Safari / WebKit (Media Channel & Ambient)
-  const unlockAudioOnTouch = () => {
+const globalAudioCtxRef = useRef<any>(null);
+
+  // Bulletproof Mobile Audio Unlock (bypasses iPhone silent switch & unlocks mobile Safari media channel)
+  const unlockAudioOnTouch = useCallback(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+      if (AudioCtx) {
+        if (!globalAudioCtxRef.current) {
+          globalAudioCtxRef.current = new AudioCtx();
+        }
+        if (globalAudioCtxRef.current.state === 'suspended') {
+          globalAudioCtxRef.current.resume();
+        }
+        // Play an inaudible 0.01s buffer burst to permanently authorize iOS Safari media playback
+        const osc = globalAudioCtxRef.current.createOscillator();
+        const gain = globalAudioCtxRef.current.createGain();
+        gain.gain.value = 0.0001;
+        osc.connect(gain);
+        gain.connect(globalAudioCtxRef.current.destination);
+        osc.start(0);
+        osc.stop(globalAudioCtxRef.current.currentTime + 0.03);
+      }
+    } catch (_) {}
+    try {
+      if (!audioPlayerRef.current) {
+        audioPlayerRef.current = new Audio();
+      }
+      audioPlayerRef.current.src =
+        'data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA';
+      audioPlayerRef.current.play().catch(() => {});
+    } catch (_) {}
+    try {
+      if (window.speechSynthesis) {
+        window.speechSynthesis.resume();
+      }
+    } catch (_) {}
+  }, []);
+  const legacyUnlock = () => {
     if (typeof window === 'undefined') return;
     try {
       if (!audioPlayerRef.current) {
@@ -1561,261 +1599,105 @@ export default function FounderDashboardPage() {
               </div>
             </div>
 
-            {/* Unified Chronological Chat Feed */}
-            <div className="bg-slate-900/70 border border-slate-800/80 rounded-3xl p-4 sm:p-6 space-y-4 shadow-2xl">
-              <div className="space-y-6 max-h-[620px] overflow-y-auto p-2 sm:p-4 bg-slate-950/90 rounded-2xl border border-slate-800/80">
-                {aiChatHistory.map((msg, i) => (
-                  <div
-                    key={i}
-                    className={`flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'} space-y-1.5`}
-                  >
-                    <div className="text-[11px] font-mono text-slate-400 px-2 font-bold flex items-center space-x-1.5">
-                      {msg.role === 'user' ? (
-                        <span className="text-cyber-cyan">DYLAN (FOUNDER)</span>
-                      ) : (
-                        <>
-                          <Bot className="w-3.5 h-3.5 text-purple-400" />
-                          <span className="text-purple-300">J.A.R.V.I.S. (CO-FOUNDER)</span>
-                        </>
-                      )}
+            {/* CLEAN EXECUTIVE STUDIO STAGE: VIDEO AD STUDIO & PLUGIN LAB */}
+            <div className="space-y-6">
+              {/* Active Video Ad Studio (Multi-Plugin Chain or Flagship Ad) */}
+              <div className="bg-slate-900/80 border border-slate-800 rounded-3xl p-6 shadow-2xl relative">
+                <div className="flex items-center justify-between pb-4 mb-4 border-b border-slate-800">
+                  <div className="flex items-center space-x-3">
+                    <div className="w-10 h-10 rounded-2xl bg-cyan-500/20 border border-cyan-500/40 flex items-center justify-center">
+                      <Video className="w-5 h-5 text-cyber-cyan" />
                     </div>
-
-                    <div
-                      className={`rounded-3xl p-5 sm:p-6 text-base sm:text-lg leading-relaxed shadow-lg max-w-[96%] sm:max-w-[90%] transition-all ${
-                        msg.role === 'user'
-                          ? 'bg-gradient-to-r from-cyber-cyan to-blue-600 text-black font-semibold shadow-glow-cyan'
-                          : 'bg-slate-900 border border-slate-800 text-slate-100'
-                      }`}
-                    >
-                      {/* Optional Voice Bar on Assistant Messages */}
-                      {msg.role === 'assistant' && msg.speech && (
-                        <div className="flex items-center justify-between pb-3 mb-3 border-b border-slate-800 text-xs sm:text-sm">
-                          <div className="flex items-center space-x-2 text-cyber-cyan font-bold">
-                            <Volume2 className="w-4 h-4 animate-pulse" />
-                            <span>Spoken Audio</span>
-                          </div>
-                          <div className="flex items-center space-x-2">
-                            {isSpeaking && (
-                              <button
-                                type="button"
-                                onClick={stopAllVoicePlayback}
-                                className="px-3 py-1 rounded-xl bg-rose-500/20 border border-rose-500 text-rose-300 font-bold hover:bg-rose-500/30 transition-all flex items-center space-x-1"
-                              >
-                                <VolumeX className="w-3.5 h-3.5" />
-                                <span>Stop Sound</span>
-                              </button>
-                            )}
-                            <button
-                              type="button"
-                              onClick={() => speakJarvisVoice(msg.speech || '')}
-                              className="px-3 py-1 rounded-xl bg-slate-800 text-slate-300 hover:text-white font-semibold transition-all flex items-center space-x-1"
-                            >
-                              <RotateCcw className="w-3.5 h-3.5" />
-                              <span>Replay</span>
-                            </button>
-                          </div>
-                        </div>
-                      )}
-
-                      
-                      {/* Attached Audio Badge on User Prompt */}
-                      {msg.attachedAudioName && (
-                        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-cyber-cyan/15 text-cyber-cyan border border-cyber-cyan/30 text-xs font-mono mb-2">
-                          <Paperclip className="w-3.5 h-3.5" />
-                          <span>Attached: {msg.attachedAudioName}</span>
-                        </div>
-                      )}
-
-                      {/* Main Highly-Readable Text Content */}
-                      <div className="whitespace-pre-wrap font-normal">{msg.text}</div>
-
-                      {/* Embedded Interactive Presentation Deck or Whiteboard Canvas */}
-                      {msg.deck && (
-                        <div className="mt-4 pt-4 border-t border-slate-800">
-                          <JarvisPresentationCanvas deck={msg.deck} />
-                        </div>
-                      )}
-
-                      {/* Embedded AI Ad Video Studio Generator */}
-                      {msg.videoAd && (
-                        <div className="mt-4 pt-4 border-t border-slate-800">
-                          <JarvisVideoAdStudio videoAd={msg.videoAd} />
-                        </div>
-                      )}
-                      {/* Embedded AI Plugin R&D Lab */}
-                      {msg.pluginSpec && (
-                        <div className="mt-4 pt-4 border-t border-slate-800">
-                          <JarvisPluginLab spec={msg.pluginSpec} />
-                        </div>
-                      )}
-
+                    <div>
+                      <h3 className="text-base font-black text-white">4-Plugin Vocal Chain Ad Studio</h3>
+                      <p className="text-xs text-slate-400">Authentic 24-bit C++ DSP Audio Progression • 100% Real Plugin GUIs</p>
                     </div>
-                  </div>
-                ))}
-
-                {aiLoading && (
-                  <div className="flex items-center space-x-3 text-cyber-cyan text-sm sm:text-base p-4 bg-slate-900 border border-slate-800 rounded-2xl w-fit animate-pulse">
-                    <RefreshCw className="w-5 h-5 animate-spin" />
-                    <span className="font-semibold">J.A.R.V.I.S. is calculating figures and formulating strategy...</span>
-                  </div>
-                )}
-                <div ref={chatBottomRef} />
-              </div>
-
-              {/* Quick Voice & Strategy Prompt Chips (Horizontal Scrolling) */}
-              <div className="w-full pt-1">
-                <div className="flex items-center space-x-2 overflow-x-auto pb-2 no-scrollbar">
-                  {[
-                    "🎬 TikTok Ad: PLUGTNE",
-                    "🎬 TikTok Ad: UNDERGRND",
-                    "🎬 TikTok Ad: PLUGCHOP",
-                    "📊 Today's Net Sales",
-                    "💡 How to Hit $10k MRR",
-                    "🖥️ Vocal Chain Whiteboard",
-                  ].map((chip) => (
-                    <button
-                      key={chip}
-                      onClick={() => {
-                        triggerHaptic(15);
-                        handleSendAiPrompt(
-                          chip === "🎬 TikTok Ad: PLUGTNE"
-                            ? "Jarvis, generate an authentic TikTok ad video for PLUGTNE using real vocal before and after audio and plugin graphics."
-                            : chip === "🎬 TikTok Ad: UNDERGRND"
-                            ? "Jarvis, generate an authentic TikTok ad video for UNDERGRND 808 saturation."
-                            : chip === "🎬 TikTok Ad: PLUGCHOP"
-                            ? "Jarvis, generate an authentic TikTok ad video for PLUGCHOP 2.0 16-pad sampler."
-                            : chip === "📊 Today's Net Sales"
-                            ? "Jarvis, how are our net take-home sales looking today?"
-                            : chip === "💡 How to Hit $10k MRR"
-                            ? "Jarvis, what is our exact strategy to hit $10,000 MRR this month?"
-                            : "Jarvis, create a whiteboard flowchart for an industry-standard Travis Scott vocal chain using PLUGTNE and PLUG VOX."
-                        );
-                      }}
-                      className="px-3.5 py-2 rounded-xl bg-slate-950 border border-slate-800 hover:border-cyber-cyan text-slate-300 hover:text-white text-xs font-semibold transition-all whitespace-nowrap active:scale-95 shrink-0 shadow-sm"
-                    >
-                      {chip}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              
-              {/* Attached Audio Preview Chip */}
-              {attachedAudioFile && (
-                <div className="flex items-center justify-between px-3.5 py-2 rounded-xl bg-cyber-cyan/15 border border-cyber-cyan/40 text-cyber-cyan text-xs font-mono mb-2">
-                  <div className="flex items-center gap-2 truncate">
-                    <Paperclip className="w-4 h-4 shrink-0" />
-                    <span className="truncate font-bold">Attached: {attachedAudioFile.name} ({(attachedAudioFile.size / 1024).toFixed(0)} KB)</span>
                   </div>
                   <button
-                    type="button"
-                    onClick={() => {
-                      setAttachedAudioFile(null);
-                      if (audioInputRef.current) audioInputRef.current.value = '';
-                    }}
-                    className="p-1 hover:text-white transition-colors"
+                    onClick={() => handleSendAiPrompt("Jarvis, make an ad using 4 plugins on a vocal chain showing off the whole suite.")}
+                    className="px-4 py-2 rounded-2xl bg-gradient-to-r from-cyber-cyan to-blue-600 text-black font-black text-xs shadow-glow-cyan hover:brightness-110 active:scale-95 transition-all flex items-center space-x-1.5"
                   >
-                    <X className="w-4 h-4" />
+                    <Sparkles className="w-4 h-4" />
+                    <span>Generate New 4-Plugin Ad</span>
                   </button>
                 </div>
-              )}
 
-              {/* Sleek Floating Input Bar Dock */}
-              <form
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  handleSendAiPrompt();
-                }}
-                className="flex items-center space-x-2 pt-1"
-              >
-                {/* Sleek Compact Microphone Button */}
-                <button
-                  type="button"
-                  onClick={toggleMic}
-                  className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 shadow-md active:scale-95 transition-all select-none ${
-                    isListening
-                      ? 'bg-rose-500 text-white animate-pulse shadow-[0_0_20px_rgba(244,63,94,0.6)]'
-                      : isSpeaking
-                      ? 'bg-purple-600 text-white shadow-glow-purple'
-                      : 'bg-slate-950 border border-cyber-cyan/50 text-cyber-cyan hover:bg-slate-900 shadow-glow-cyan'
-                  }`}
-                  title={isListening ? 'Listening (Tap to send)' : isSpeaking ? 'Speaking (Tap to interrupt)' : 'Tap to Speak'}
-                >
-                  {isListening ? (
-                    <MicOff className="w-5 h-5 animate-pulse" />
-                  ) : isSpeaking ? (
-                    <VolumeX className="w-5 h-5" />
-                  ) : (
-                    <Mic className="w-5 h-5" />
-                  )}
-                </button>
+                {/* Render active or latest generated video ad */}
+                {(() => {
+                  const lastAd = [...aiChatHistory].reverse().find((m) => m.videoAd)?.videoAd || {
+                    pluginId: 'plugtne',
+                    pluginName: 'Full Vocal Chain Suite (4 Plugins)',
+                    hookHeadline: 'How To Get Radio-Ready Vocals with 4 C++ Plugins in FL Studio',
+                    targetAudience: 'FL Studio Trap & Vocal Producers',
+                    aspectRatio: '9:16',
+                    audioPair: 'vocal',
+                    isChainAd: true,
+                    chainPlugins: [
+                      { id: 'plugtne', name: '1. PLUGTNE' },
+                      { id: 'plugeq', name: '2. PLUGEQ' },
+                      { id: 'plugvox', name: '3. PLUGVOX' },
+                      { id: 'plugverb', name: '4. PLUGVERB' },
+                    ],
+                    callToAction: 'Grab the All-Access Studio Pass at pluggedin.studio • Link in bio',
+                    scenes: [
+                      { sceneNumber: 1, durationSec: 3, headline: 'Stop letting raw vocals ruin your beat.', visualAction: 'Raw vocal in FL Studio with pitch alert.', audioMode: 'dry', badgeText: 'BEFORE: RAW DEMO', subtitles: ['Stop', 'recording', 'amateur', 'vocals', 'in', 'FL', 'Studio.'], pluginId: 'plugtne' },
+                      { sceneNumber: 2, durationSec: 3, headline: 'Step 1: Snap pitch with PLUGTNE 0ms autotune.', visualAction: 'PLUGTNE locks vocal pitch instantly.', audioMode: 'tuned', badgeText: 'STEP 1: PLUGTNE (0MS PITCH)', subtitles: ['One', 'click', 'and', 'your', 'pitch', 'snaps', 'instantly.'], pluginId: 'plugtne' },
+                      { sceneNumber: 3, durationSec: 3, headline: 'Step 2: Add Pultec air sheen with PLUGEQ.', visualAction: 'PLUGEQ Pultec high-shelf boosts +3dB at 10.5kHz.', audioMode: 'wet', badgeText: 'STEP 2: PLUGEQ (+3dB AIR)', subtitles: ['Expensive', 'high', 'end', 'air', 'without', 'harshness.'], pluginId: 'plugeq' },
+                      { sceneNumber: 4, durationSec: 3, headline: 'Step 3: RVox optical leveling with PLUGVOX.', visualAction: 'PLUGVOX pins the vocal upfront.', audioMode: 'wet', badgeText: 'STEP 3: PLUGVOX (LEVELER)', subtitles: ['Smooth', 'optical', 'leveling', 'pins', 'the', 'vocal', 'upfront.'], pluginId: 'plugvox' },
+                      { sceneNumber: 5, durationSec: 3, headline: 'Step 4: Algorithmic plate space with PLUGVERB.', visualAction: 'PLUGVERB lush 1.6s stereo decay.', audioMode: 'wet', badgeText: 'STEP 4: PLUGVERB (PLATE)', subtitles: ['Lush', 'stereo', 'depth', 'that', 'never', 'muddies', 'the', 'beat.'], pluginId: 'plugverb' },
+                      { sceneNumber: 6, durationSec: 3, headline: 'Full Studio Chain: Radio ready in 4 clicks.', visualAction: 'Finished vocal playing in full beat, link in bio overlay.', audioMode: 'wet', badgeText: 'FULL 4-PLUGIN CHAIN ACTIVE', subtitles: ['Grab', 'the', 'studio', 'pass.', 'Link', 'in', 'bio.'], pluginId: 'plugverb' },
+                    ],
+                  };
+                  return <JarvisVideoAdStudio videoAd={lastAd} />;
+                })()}
+              </div>
 
-                
-                {/* Audio Attachment Button */}
-                <input
-                  type="file"
-                  ref={audioInputRef}
-                  accept="audio/*,.wav,.mp3,.m4a"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (file) {
-                      setAttachedAudioFile(file);
-                      triggerHaptic(15);
-                    }
-                  }}
-                  className="hidden"
-                />
-                <button
-                  type="button"
-                  onClick={() => audioInputRef.current?.click()}
-                  className={`w-12 h-12 rounded-2xl border flex items-center justify-center shrink-0 transition-all active:scale-95 ${
-                    attachedAudioFile
-                      ? 'bg-cyber-cyan text-black border-cyber-cyan font-bold shadow-[0_0_15px_rgba(0,240,255,0.4)]'
-                      : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
-                  }`}
-                  title="Attach Vocal or Sample (.wav, .mp3)"
-                >
-                  <Paperclip className="w-5 h-5" />
-                </button>
+              {/* AI Plugin R&D Lab Stage (Knobs, OLED Waveform, DSP) */}
+              <div className="bg-slate-900/80 border border-slate-800 rounded-3xl p-6 shadow-2xl">
+                <div className="flex items-center justify-between pb-4 mb-4 border-b border-slate-800">
+                  <div className="flex items-center space-x-3">
+                    <div className="w-10 h-10 rounded-2xl bg-purple-500/20 border border-purple-500/40 flex items-center justify-center">
+                      <Zap className="w-5 h-5 text-purple-400" />
+                    </div>
+                    <div>
+                      <h3 className="text-base font-black text-white">AI Plugin R&D Laboratory</h3>
+                      <p className="text-xs text-slate-400">Interactive Radial Controls • OLED Waveform Visualizer • JUCE C++ Specs</p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => handleSendAiPrompt("Jarvis, invent a new analog tube saturation and tape exciter plugin called PLUGHEAT that beats Decapitator.")}
+                    className="px-4 py-2 rounded-2xl bg-purple-600 hover:bg-purple-500 text-white font-black text-xs shadow-glow-purple active:scale-95 transition-all flex items-center space-x-1.5"
+                  >
+                    <Sparkles className="w-4 h-4 text-cyan-300" />
+                    <span>Formulate New Plugin</span>
+                  </button>
+                </div>
 
-                {/* Siri Dictation Trigger (Mobile Friendly) */}
-                <button
-                  type="button"
-                  onClick={() => {
-                    triggerHaptic(10);
-                    unlockAudioOnTouch();
-                    setDictationModalOpen(true);
-                  }}
-                  className="w-12 h-12 rounded-2xl bg-slate-950 border border-slate-800 text-slate-400 hover:text-white flex items-center justify-center shrink-0 transition-all active:scale-95"
-                  title="Type or Siri Dictate"
-                >
-                  <MessageSquare className="w-5 h-5 text-cyber-cyan" />
-                </button>
-
-                {/* Main Text Input */}
-                <input
-                  type="text"
-                  value={aiPrompt}
-                  onChange={(e) => setAiPrompt(e.target.value)}
-                  placeholder={
-                    isListening
-                      ? 'J.A.R.V.I.S. is listening to your voice...'
-                      : transcriptPreview
-                      ? transcriptPreview
-                      : 'Ask J.A.R.V.I.S. anything or say "generate a TikTok ad for PLUGTNE"...'
-                  }
-                  className="flex-1 bg-slate-950 border border-slate-800 rounded-2xl px-4 py-3.5 text-sm sm:text-base text-white focus:outline-none focus:border-cyber-cyan transition-all placeholder:text-slate-500"
-                />
-
-                {/* Send Button */}
-                <button
-                  type="submit"
-                  disabled={aiLoading || !aiPrompt.trim()}
-                  className="w-12 h-12 rounded-2xl bg-gradient-to-r from-cyber-cyan to-blue-600 text-black font-bold flex items-center justify-center shrink-0 shadow-glow-cyan hover:brightness-110 active:scale-95 transition-all disabled:opacity-40"
-                >
-                  <Send className="w-5 h-5" />
-                </button>
-              </form>
+                {(() => {
+                  const lastSpec = [...aiChatHistory].reverse().find((m) => m.pluginSpec)?.pluginSpec || {
+                    name: 'PLUGHEAT',
+                    tagline: 'Dual-Stage Analog Tube Saturation & Dynamic Tape Exciter',
+                    category: 'Analog Saturation & Harmonic Color',
+                    chassisTheme: 'cyberpunk_cyan',
+                    controls: [
+                      { id: 'drive', label: 'DRIVE', type: 'knob' as const, defaultValue: 65, unit: '%' },
+                      { id: 'tube_bias', label: 'TUBE BIAS', type: 'knob' as const, defaultValue: 45, unit: '%' },
+                      { id: 'tape_air', label: 'TAPE AIR', type: 'knob' as const, defaultValue: 80, unit: '%' },
+                      { id: 'warmth', label: 'WARMTH', type: 'knob' as const, defaultValue: 50, unit: '%' },
+                      { id: 'mix', label: 'MIX', type: 'knob' as const, defaultValue: 100, unit: '%' },
+                    ],
+                    dspBreakdown: [
+                      'Asymmetric triode transfer function with real-time even harmonic overtones',
+                      'Magnetic hysteresis emulation smoothing high-frequency transient peaks',
+                      'Zero-latency 4x oversampling with linear-phase reconstruction filter',
+                    ],
+                    competitorEdge: 'Uses 0.4% CPU in FL Studio with zero latency, outperforming bulky legacy saturation plugins.',
+                    targetBpmKey: 'FL Studio 140 BPM Trap & Hip-Hop',
+                    cppSnippet: '// C++ DSP Core Snippet\nclass PlugHeatDSP {\n  float processSample(float in) {\n    return std::tanh(in * driveFactor);\n  }\n};',
+                  };
+                  return <JarvisPluginLab spec={lastSpec} />;
+                })()}
+              </div>
             </div>
           </div>
         )}
