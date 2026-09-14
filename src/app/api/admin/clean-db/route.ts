@@ -24,10 +24,15 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  return handleCleanup();
+  let deleteEmail: string | undefined;
+  try {
+    const body = await req.json();
+    deleteEmail = body?.deleteEmail;
+  } catch {}
+  return handleCleanup(deleteEmail);
 }
 
-async function handleCleanup() {
+async function handleCleanup(deleteEmail?: string) {
   try {
     const redis = getRedis();
     let currentUsers: UserRecord[] = [];
@@ -41,6 +46,12 @@ async function handleCleanup() {
           currentUsers = JSON.parse(data);
         } catch {}
       }
+    }
+
+    if (deleteEmail) {
+      currentUsers = currentUsers.filter(
+        (u) => u.email.toLowerCase() !== deleteEmail.trim().toLowerCase()
+      );
     }
 
     // Run strict deduplication & founder migration
