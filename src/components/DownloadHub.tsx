@@ -17,7 +17,7 @@ export const DownloadHub: React.FC = () => {
     }
   }, []);
 
-  const winDownloadUrl = 'https://github.com/dylangoodm2468590840/pluggedin-releases-/releases/download/central-v3.0.0/PluggedIN-Central_Setup_3.0.2.exe';
+  const winDownloadUrl = 'https://github.com/dylangoodm2468590840/pluggedin-releases-/releases/download/central-v3.0.3/PluggedIN-Central_Setup_3.0.3.exe';
   const macDownloadUrl = 'https://github.com/dylangoodm2468590840/pluggedin-releases-/releases/download/central-v3.0.0/PluggedIN.Central_Mac_Universal_3.0.2.dmg';
 
   return (
