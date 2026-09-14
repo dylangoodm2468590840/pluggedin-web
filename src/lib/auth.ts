@@ -758,4 +758,94 @@ export async function deactivateUserMachine(
   };
 }
 
+export interface OrderRecord {
+  id: string;
+  paypalOrderId: string;
+  paypalCaptureId?: string;
+  userId: string;
+  userEmail: string;
+  displayName?: string;
+  itemType: 'subscription_monthly' | 'subscription_annual' | 'perpetual_plugin' | 'vip_promo';
+  itemName: string;
+  pluginId?: string;
+  grossAmount: number;
+  feeAmount: number;
+  netAmount: number;
+  promoCode?: string;
+  currency: string;
+  status: 'completed' | 'refunded' | 'disputed';
+  createdAt: string;
+}
+
+export async function fetchOrders(): Promise<OrderRecord[]> {
+  const redis = getRedis();
+  if (redis) {
+    try {
+      const data = await redis.get('pluggedin_orders');
+      if (Array.isArray(data)) return data;
+      if (typeof data === 'string') {
+        try {
+          return JSON.parse(data);
+        } catch {}
+      }
+    } catch (e) {
+      console.warn('Error fetching orders from Upstash:', e);
+    }
+  }
+  return [];
+}
+
+export async function saveOrderRecord(order: OrderRecord): Promise<void> {
+  const redis = getRedis();
+  const currentOrders = await fetchOrders();
+  const exists = currentOrders.some(
+    (o) => o.id === order.id || (order.paypalOrderId && o.paypalOrderId === order.paypalOrderId)
+  );
+
+  if (!exists) {
+    currentOrders.unshift(order);
+    if (redis) {
+      try {
+        await redis.set('pluggedin_orders', currentOrders);
+      } catch (e) {
+        console.warn('Error saving order to Upstash:', e);
+      }
+    }
+  }
+}
+
+export async function resetAllUserMachines(userId: string): Promise<UserSafeProfile> {
+  const cloudUsers = await fetchCloudUsers();
+  const users = cloudUsers || readUsers();
+  const user = users.find((u) => u.id === userId);
+  if (!user) throw new Error('User not found');
+  user.machines = [];
+  user.authorizedMachines = [];
+  writeUsers(users);
+  await saveCloudUsers(users);
+  return toSafeProfile(user);
+}
+
+export async function fetchAllUsersSafe(): Promise<UserSafeProfile[]> {
+  const cloudUsers = await fetchCloudUsers();
+  const users = cloudUsers || readUsers();
+  return users.map((u) => toSafeProfile(u));
+}
+
+export async function revokeUserAccess(userId: string): Promise<UserSafeProfile> {
+  const cloudUsers = await fetchCloudUsers();
+  const users = cloudUsers || readUsers();
+  const user = users.find((u) => u.id === userId);
+  if (!user) throw new Error('User not found');
+  user.subscriptionStatus = 'none';
+  user.isLifetimeVIP = false;
+  user.machines = [];
+  user.authorizedMachines = [];
+  user.ownedPlugins = [];
+  writeUsers(users);
+  await saveCloudUsers(users);
+  return toSafeProfile(user);
+}
+
+
 

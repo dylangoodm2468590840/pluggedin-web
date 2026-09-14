@@ -7,6 +7,7 @@ import {
   createUser,
   grantUserAccess,
   createSessionToken,
+  saveOrderRecord,
 } from '../../../../lib/auth';
 
 export async function POST(req: NextRequest) {
@@ -98,6 +99,35 @@ export async function POST(req: NextRequest) {
       updatedUser = await grantUserAccess(userId, {
         tier: 'All-Access Studio Pass',
       });
+    }
+
+    // 4. Record order in database for Founder Dashboard
+    try {
+      const capture = captureResult.purchase_units?.[0]?.payments?.captures?.[0];
+      const grossVal = parseFloat(capture?.seller_receivable_breakdown?.gross_amount?.value || capture?.amount?.value || '0');
+      const feeVal = parseFloat(capture?.seller_receivable_breakdown?.paypal_fee?.value || '0');
+      const netVal = parseFloat(capture?.seller_receivable_breakdown?.net_amount?.value || (grossVal - feeVal).toFixed(2));
+      const captureId = capture?.id;
+
+      await saveOrderRecord({
+        id: 'ord_' + (captureId || orderId),
+        paypalOrderId: orderId,
+        paypalCaptureId: captureId,
+        userId: updatedUser.id,
+        userEmail: updatedUser.email,
+        displayName: updatedUser.displayName,
+        itemType: plan === 'annual' ? 'subscription_annual' : plan === 'monthly' ? 'subscription_monthly' : 'perpetual_plugin',
+        itemName: pluginId ? `Perpetual License: ${pluginId}` : `All-Access Pass (${plan === 'annual' ? 'Annual' : 'Monthly'})`,
+        pluginId: pluginId || undefined,
+        grossAmount: grossVal,
+        feeAmount: feeVal,
+        netAmount: netVal,
+        currency: capture?.amount?.currency_code || 'USD',
+        status: 'completed',
+        createdAt: new Date().toISOString(),
+      });
+    } catch (orderErr) {
+      console.warn('Could not record order log:', orderErr);
     }
 
     const response = NextResponse.json({

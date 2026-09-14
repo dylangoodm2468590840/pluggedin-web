@@ -2,10 +2,16 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { Sparkles, Download, User, Menu, X, Disc, ShieldCheck } from 'lucide-react';
 
 export const Header: React.FC = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const pathname = usePathname();
+
+  if (pathname?.startsWith('/founder')) {
+    return null;
+  }
 
   return (
     <header className="sticky top-0 z-50 w-full border-b border-white/5 bg-studio-950/80 backdrop-blur-xl">

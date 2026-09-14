@@ -1,12 +1,27 @@
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import './globals.css';
 import { Header } from '../components/Header';
 import { Footer } from '../components/Footer';
+import { TrafficTracker } from '../components/TrafficTracker';
+
+export const viewport: Viewport = {
+  themeColor: '#030712',
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1,
+  viewportFit: 'cover',
+};
 
 export const metadata: Metadata = {
   title: 'PluggedIN Audio | Next-Gen VST3 & AU Studio Plugins',
   description: '15 flagship audio production plugins for FL Studio, Pro Tools, Logic Pro, and Ableton. Featuring PlugChop 16-Pad Sampler, PLUGTNE AutoTune, and Underground Analog Saturation.',
   keywords: ['audio plugins', 'vst3', 'au', 'autotune', 'sampler', 'mpc', 'fl studio', 'logic pro', 'pro tools', 'plugtune', 'plugchop', 'slate digital', 'waves'],
+  manifest: '/manifest.json',
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'black-translucent',
+    title: 'PluggedIN',
+  },
   openGraph: {
     title: 'PluggedIN Audio | Studio-Grade Audio Plugins',
     description: 'Zero-latency autotune, 16-pad sampling, and analog heat. Download PluggedIN Central today.',
@@ -22,6 +37,7 @@ export default function RootLayout({
   return (
     <html lang="en" className="dark">
       <body className="min-h-screen flex flex-col bg-studio-950 text-slate-100 antialiased selection:bg-cyber-cyan selection:text-black">
+        <TrafficTracker />
         <Header />
         <main className="flex-grow">
           {children}

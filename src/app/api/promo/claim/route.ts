@@ -6,6 +6,7 @@ import {
   verifyUserLogin,
   grantUserAccess,
   createSessionToken,
+  saveOrderRecord,
 } from '../../../../lib/auth';
 
 const VALID_PROMO_CODES: Record<
@@ -179,6 +180,29 @@ export async function POST(req: NextRequest) {
       maxDevices: match.maxDevices || 5,
       pluginId: pluginId || undefined,
     });
+
+    // Record promotional claim in database order log
+    try {
+      await saveOrderRecord({
+        id: 'promo_' + userId + '_' + Date.now(),
+        paypalOrderId: 'PROMO_' + cleanCode,
+        userId: updatedUser.id,
+        userEmail: updatedUser.email,
+        displayName: updatedUser.displayName,
+        itemType: 'vip_promo',
+        itemName: `${match.tier} (Promo: ${cleanCode})`,
+        pluginId: pluginId || undefined,
+        grossAmount: 0,
+        feeAmount: 0,
+        netAmount: 0,
+        promoCode: cleanCode,
+        currency: 'USD',
+        status: 'completed',
+        createdAt: new Date().toISOString(),
+      });
+    } catch (logErr) {
+      console.warn('Could not record promo claim log:', logErr);
+    }
 
     const response = NextResponse.json({
       success: true,
