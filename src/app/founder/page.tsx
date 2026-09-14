@@ -177,6 +177,24 @@ export default function FounderDashboardPage() {
   const [hasPlayedStartupBriefing, setHasPlayedStartupBriefing] = useState(false);
   const triggerAutoListenRef = useRef<() => void>(() => {});
 
+  // Dynamic Dashboard UI Layout State (Jarvis Voice Reconfigurable)
+  const [dashboardConfig, setDashboardConfig] = useState<{
+    showChatButtons: boolean;
+    showTopStats: boolean;
+  }>({
+    showChatButtons: false, // Default to FALSE to eliminate clutter from the top
+    showTopStats: true,
+  });
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('pluggedin_dashboard_config');
+      if (saved) {
+        setDashboardConfig((prev) => ({ ...prev, ...JSON.parse(saved) }));
+      }
+    } catch (_) {}
+  }, []);
+
 
   // JARVIS Voice Engine & Mobile state
   const [isVoiceEnabled, setIsVoiceEnabled] = useState(true);
@@ -965,6 +983,17 @@ export default function FounderDashboardPage() {
 
         if (data.hudAction) {
           const action = data.hudAction;
+          if (action.action === 'modify_ui' && action.config) {
+            setDashboardConfig((prev) => {
+              const updated = { ...prev, ...action.config };
+              try {
+                localStorage.setItem('pluggedin_dashboard_config', JSON.stringify(updated));
+              } catch (_) {}
+              return updated;
+            });
+            setActionMessage(`🎨 J.A.R.V.I.S.: ${action.caption || 'Dashboard Layout Updated'}`);
+            setTimeout(() => setActionMessage(null), 5000);
+          }
           if (action.tab) {
             if (action.tab === 'studio' || action.tab === 'social' || action.tab === 'analytics') {
               setActiveNavTab(action.tab);
@@ -1173,27 +1202,29 @@ export default function FounderDashboardPage() {
             <div>
               <div className="flex items-center space-x-2">
 
-                {/* + New Chat & History Buttons */}
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={startNewChat}
-                    className="px-3 py-1.5 rounded-xl bg-cyber-cyan/15 hover:bg-cyber-cyan/25 text-cyber-cyan border border-cyber-cyan/30 text-xs font-mono font-bold transition-all flex items-center gap-1.5 active:scale-95 shadow-sm"
-                    title="Start a fresh chat thread"
-                  >
-                    <Plus className="w-3.5 h-3.5" />
-                    <span>New Chat</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setChatHistoryDrawerOpen(!chatHistoryDrawerOpen)}
-                    className="px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-700 text-xs font-mono transition-all flex items-center gap-1.5 active:scale-95"
-                    title="View past conversations"
-                  >
-                    <History className="w-3.5 h-3.5" />
-                    <span>Past Chats</span>
-                  </button>
-                </div>
+                {/* Dynamic New Chat & History Buttons (Controlled by Jarvis voice & dashboardConfig) */}
+                {dashboardConfig.showChatButtons && (
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={startNewChat}
+                      className="px-3 py-1.5 rounded-xl bg-cyber-cyan/15 hover:bg-cyber-cyan/25 text-cyber-cyan border border-cyber-cyan/30 text-xs font-mono font-bold transition-all flex items-center gap-1.5 active:scale-95 shadow-sm"
+                      title="Start a fresh chat thread"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>New Chat</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setChatHistoryDrawerOpen(!chatHistoryDrawerOpen)}
+                      className="px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-700 text-xs font-mono transition-all flex items-center gap-1.5 active:scale-95"
+                      title="View past conversations"
+                    >
+                      <History className="w-3.5 h-3.5" />
+                      <span>Past Chats</span>
+                    </button>
+                  </div>
+                )}
 
                 <span className="text-base font-black tracking-wider text-white">J.A.R.V.I.S.</span>
                 <span className="text-[10px] font-mono bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-2 py-0.5 rounded-full font-bold">

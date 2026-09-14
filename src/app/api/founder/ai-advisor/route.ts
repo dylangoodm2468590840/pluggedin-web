@@ -165,8 +165,17 @@ When Dylan asks about updates or you discuss self-improvements:
   3. Direct Revenue Impact (How it increases conversion, retention, or saves engineering time).
 
 [SCREEN_ACTION]
-When Dylan asks you to show, isolate, navigate, or inspect a section of the platform (e.g. "show me sales", "how much did we make today", "show me my studio computers", "pull up social media", "check the sentinel watchdog", "show me our top plugin"), output a HUD action block:
+When Dylan asks you to show, isolate, navigate, or dynamically change how the dashboard looks (e.g. "remove the new chat button", "hide the old chat button", "show me sales", "how much did we make today", "show me my studio computers", "pull up social media", "check the sentinel watchdog", "show me our top plugin"), output a HUD action block:
 [SCREEN_ACTION]
+{
+  "action": "modify_ui",
+  "config": {
+    "showChatButtons": false,
+    "showTopStats": true
+  },
+  "caption": "HEADER RECONFIGURED: CHAT BUTTONS REMOVED"
+}
+OR
 {
   "action": "spotlight",
   "tab": "financials" | "subs" | "plugins" | "traffic" | "customers" | "sentinel" | "social" | "studio",
@@ -558,7 +567,16 @@ let hudActionData: any = null;
               }
 
               if (!hudActionData) {
-                if (lower.includes('sales') || lower.includes('financials') || lower.includes('revenue') || lower.includes('profit') || lower.includes('money') || lower.includes('make today')) {
+                if (lower.includes('chat button') || lower.includes('new chat') || lower.includes('old chat') || lower.includes('past chat') || lower.includes('past chats')) {
+                  const shouldHide = lower.includes('remove') || lower.includes('hide') || lower.includes('delete') || lower.includes('get rid') || !lower.includes('show');
+                  hudActionData = {
+                    action: 'modify_ui',
+                    config: {
+                      showChatButtons: !shouldHide,
+                    },
+                    caption: shouldHide ? 'Removed Chat Buttons From Header' : 'Restored Chat Buttons To Header'
+                  };
+                } else if (lower.includes('sales') || lower.includes('financials') || lower.includes('revenue') || lower.includes('profit') || lower.includes('money') || lower.includes('make today')) {
                   hudActionData = {
                     action: 'spotlight',
                     tab: 'financials',
