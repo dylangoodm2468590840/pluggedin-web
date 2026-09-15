@@ -160,7 +160,11 @@ export function deduplicateUsers(users: UserRecord[]): UserRecord[] {
     if (
       cleanEmail.includes('hitmakers.com') ||
       cleanEmail.startsWith('test_') ||
-      cleanEmail === 'testfriend@pluggedin.studio'
+      cleanEmail === 'testfriend@pluggedin.studio' ||
+      cleanEmail.includes('buddy.verification.') ||
+      cleanEmail.includes('buddy.vip.') ||
+      cleanEmail.includes('buddy.free.') ||
+      cleanEmail === 'dylanfriendtest@example.com'
     ) {
       continue;
     }
