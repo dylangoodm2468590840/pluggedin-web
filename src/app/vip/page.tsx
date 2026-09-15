@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useState } from 'react';
-import { Sparkles, CheckCircle2, ShieldCheck, Download, Laptop, Apple, ArrowRight, Lock, Key } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Sparkles, CheckCircle2, ShieldCheck, Download, Laptop, Apple, ArrowRight, Lock, Key, ShieldAlert } from 'lucide-react';
 
 export default function VipInvitePage() {
   const [name, setName] = useState('');
@@ -10,6 +10,29 @@ export default function VipInvitePage() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successUser, setSuccessUser] = useState<any | null>(null);
+  const [isValidKey, setIsValidKey] = useState<boolean | null>(null);
+  const [key, setKey] = useState('');
+
+  const VALID_KEYS = [
+    'dylan_vip_8f9c21b3',
+    'dylan-vip-exclusive-2026',
+    'dylan-vip-2026',
+  ];
+
+  useEffect(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const k = (params.get('key') || params.get('token') || params.get('access') || '').trim();
+      if (VALID_KEYS.includes(k)) {
+        setKey(k);
+        setIsValidKey(true);
+      } else {
+        setIsValidKey(false);
+      }
+    } catch {
+      setIsValidKey(false);
+    }
+  }, []);
 
   const winDownloadUrl = 'https://github.com/dylangoodm2468590840/pluggedin-releases-/releases/download/central-v3.0.3/PluggedIN-Central_Setup_3.0.3.exe';
   const macDownloadUrl = 'https://github.com/dylangoodm2468590840/pluggedin-releases-/releases/download/central-v3.0.0/PluggedIN.Central_Mac_Universal_3.0.2.dmg';
@@ -27,6 +50,7 @@ export default function VipInvitePage() {
           displayName: name,
           email,
           password,
+          vipKey: key,
         }),
       });
 
@@ -66,7 +90,34 @@ export default function VipInvitePage() {
           <div className="absolute -top-24 -right-24 w-48 h-48 bg-purple-500/20 rounded-full blur-3xl pointer-events-none" />
           <div className="absolute -bottom-24 -left-24 w-48 h-48 bg-cyan-500/20 rounded-full blur-3xl pointer-events-none" />
 
-          {successUser ? (
+          {isValidKey === null ? (
+            <div className="py-16 text-center text-slate-400 text-xs font-mono animate-pulse">
+              Verifying VIP invitation credentials...
+            </div>
+          ) : !isValidKey ? (
+            <div className="py-10 text-center space-y-5 animate-fade-in">
+              <div className="w-16 h-16 rounded-2xl bg-rose-500/10 border border-rose-500/30 text-rose-400 flex items-center justify-center mx-auto">
+                <Lock className="w-8 h-8" />
+              </div>
+              <div className="space-y-2">
+                <h2 className="text-2xl font-black text-white tracking-tight">
+                  Private VIP Invitation Required
+                </h2>
+                <p className="text-xs text-slate-400 max-w-sm mx-auto leading-relaxed">
+                  This portal is strictly unlisted and by personal invitation only. If Dylan Goodman sent you an invitation link, please make sure you use the complete link with your access key.
+                </p>
+              </div>
+              <div className="pt-3">
+                <a
+                  href="/"
+                  className="inline-flex items-center space-x-2 px-5 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-white text-xs font-bold transition-all"
+                >
+                  <span>Return to Official Store</span>
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </a>
+              </div>
+            </div>
+          ) : successUser ? (
             /* Success State */
             <div className="space-y-6 text-center animate-fade-in">
               <div className="w-16 h-16 rounded-2xl bg-emerald-500/20 border border-emerald-500/40 text-emerald-400 flex items-center justify-center mx-auto shadow-glow-emerald">

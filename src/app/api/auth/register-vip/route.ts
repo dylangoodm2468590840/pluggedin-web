@@ -1,10 +1,26 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createVipUser } from '../../../../lib/auth';
 
+const VALID_VIP_KEYS = [
+  'dylan_vip_8f9c21b3',
+  'dylan-vip-exclusive-2026',
+  'dylan-vip-2026',
+];
+
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { email, password, displayName } = body;
+    const { email, password, displayName, vipKey } = body;
+
+    const authHeaderKey = req.headers.get('x-vip-key');
+    const providedKey = (vipKey || authHeaderKey || '').trim();
+
+    if (!providedKey || !VALID_VIP_KEYS.includes(providedKey)) {
+      return NextResponse.json(
+        { success: false, error: 'Unauthorized: Invalid or missing secret VIP invitation key.' },
+        { status: 403 }
+      );
+    }
 
     if (!email || !password) {
       return NextResponse.json(
