@@ -44,11 +44,12 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json();
-    const { prompt, currentMetrics, chatHistory, audioUrl, audioFilename } = body;
+    const { prompt, currentMetrics, chatHistory, audioUrl, audioFilename, audioBase64, audioMimeType } = body;
 
-    if (!prompt || typeof prompt !== 'string') {
-      return NextResponse.json({ success: false, error: 'Prompt is required.' }, { status: 400 });
+    if ((!prompt || typeof prompt !== 'string') && !audioBase64) {
+      return NextResponse.json({ success: false, error: 'Prompt or audio is required.' }, { status: 400 });
     }
+    const userPrompt = prompt || 'Analyze incoming voice audio and respond with charismatic male executive co-founder authority.';
 
     // Pull live metrics if not supplied by client
     let net = currentMetrics?.netTotal || 0;
@@ -421,13 +422,14 @@ When Dylan asks to create, generate, script, or brainstorm an ad, video ad, TikT
   ]
 }`;
 
-    // 1. Google Gemini Neural Reasoning
+    // 1. Google Gemini Neural Reasoning (Multimodal Audio + Reasoning)
     if (geminiKey) {
       const candidateModels = [
-        aiConfig?.model || 'models/gemini-3-flash-preview',
-        'models/gemini-3.5-flash',
-        'models/gemini-3.1-flash-lite-preview',
-        'models/gemini-flash-latest',
+        'models/gemini-2.0-flash',
+        'models/gemini-2.0-flash-exp',
+        'models/gemini-1.5-pro',
+        'models/gemini-1.5-flash',
+        aiConfig?.model || 'models/gemini-2.0-flash',
       ];
 
       // Format multi-turn conversation history
@@ -451,18 +453,30 @@ When Dylan asks to create, generate, script, or brainstorm an ad, video ad, TikT
         }
       }
 
-      // Append current user prompt
-      if (
-        formattedContents.length === 0 ||
-        formattedContents[formattedContents.length - 1].role !== 'user'
-      ) {
-        formattedContents.push({
-          role: 'user',
-          parts: [{ text: prompt }],
+      // Append current user prompt / multimodal audio
+      const userParts: any[] = [];
+      if (audioBase64) {
+        userParts.push({
+          inlineData: {
+            mimeType: audioMimeType || 'audio/webm',
+            data: audioBase64,
+          },
+        });
+        userParts.push({
+          text: `[INCOMING STUDIO AUDIO]: Dylan is speaking aloud in his music studio. Listen carefully to his voice, words, tone, and inflection.
+1. Transcribe Dylan's exact spoken words inside [HEARD_TEXT]...[/HEARD_TEXT].
+2. Answer Dylan directly as his charismatic, ambitious male executive co-founder and studio partner. Answer whatever he asked with absolute honesty, clarity, and personality.
+3. NEVER repeat or parrot Dylan's words back before answering. Jump straight into the answer.
+4. Place your concise spoken response (1-2 sentences) inside [VOICE_SPEECH]...[/VOICE_SPEECH] and your full detailed written analysis inside [WRITTEN_BRIEFING]...[/WRITTEN_BRIEFING].`,
         });
       } else {
-        formattedContents[formattedContents.length - 1].parts[0].text = prompt;
+        userParts.push({ text: userPrompt });
       }
+
+      formattedContents.push({
+        role: 'user',
+        parts: userParts,
+      });
 
       for (const model of candidateModels) {
         try {
@@ -488,10 +502,19 @@ When Dylan asks to create, generate, script, or brainstorm an ad, video ad, TikT
             const data = await geminiRes.json();
             let candidateText = data.candidates?.[0]?.content?.parts?.[0]?.text;
             if (candidateText) {
+              let heardText = '';
+              if (candidateText.includes('[HEARD_TEXT]')) {
+                const heardMatch = candidateText.match(/\[HEARD_TEXT\]([\s\S]*?)(\[\/HEARD_TEXT\]|$)/i);
+                if (heardMatch && heardMatch[1]) {
+                  heardText = heardMatch[1].trim();
+                  candidateText = candidateText.replace(/\[HEARD_TEXT\][\s\S]*?(\[\/HEARD_TEXT\]|$)/gi, '').trim();
+                }
+              }
+
               let deckData: any = null;
               let videoAdData: any = null;
               let pluginSpecData: any = null;
-let hudActionData: any = null;
+              let hudActionData: any = null;
 
               if (candidateText.includes('[SCREEN_ACTION]')) {
                 const actionParts = candidateText.split('[SCREEN_ACTION]');
@@ -831,18 +854,39 @@ let hudActionData: any = null;
                   : ''
               );
 
-              if (cleanedCandidateText.includes('[WRITTEN_BRIEFING]')) {
-                const parts = cleanedCandidateText.split('[WRITTEN_BRIEFING]');
-                speech = parts[0].replace(/\[VOICE_SPEECH\]/g, '').trim();
-                advice = parts[1].trim();
-              } else if (cleanedCandidateText.includes('[SPEECH_BREAK]')) {
-                const parts = cleanedCandidateText.split('[SPEECH_BREAK]');
-                speech = parts[0].trim();
-                advice = parts[1].trim();
-              } else {
-                speech = cleanedCandidateText.split('\n')[0].replace(/[*#_~`]/g, '').trim();
-                advice = cleanedCandidateText;
+              let extractedSpeech = '';
+              let extractedAdvice = '';
+
+              if (cleanedCandidateText.includes('[VOICE_SPEECH]')) {
+                const sMatch = cleanedCandidateText.match(/\[VOICE_SPEECH\]([\s\S]*?)(\[\/VOICE_SPEECH\]|$)/i);
+                if (sMatch && sMatch[1]) {
+                  extractedSpeech = sMatch[1].trim();
+                }
               }
+
+              if (cleanedCandidateText.includes('[WRITTEN_BRIEFING]')) {
+                const wMatch = cleanedCandidateText.match(/\[WRITTEN_BRIEFING\]([\s\S]*?)(\[\/WRITTEN_BRIEFING\]|$)/i);
+                if (wMatch && wMatch[1]) {
+                  extractedAdvice = wMatch[1].trim();
+                }
+              }
+
+              if (!extractedSpeech) {
+                const cleaned = cleanedCandidateText
+                  .replace(/\[\/?(VOICE_SPEECH|WRITTEN_BRIEFING|HEARD_TEXT|AD_VIDEO|PLUGIN_SPEC|PRESENTATION_DECK|SCREEN_ACTION)\]/gi, '')
+                  .trim();
+                const firstPara = cleaned.split('\n\n')[0] || cleaned.split('\n')[0];
+                extractedSpeech = firstPara.replace(/[*#_~`>]/g, '').slice(0, 200).trim();
+                extractedAdvice = cleaned;
+              }
+              if (!extractedAdvice) {
+                extractedAdvice = cleanedCandidateText
+                  .replace(/\[\/?(VOICE_SPEECH|WRITTEN_BRIEFING|HEARD_TEXT)\]/gi, '')
+                  .trim();
+              }
+
+              speech = extractedSpeech.replace(/\[\/?VOICE_SPEECH\]/gi, '').trim();
+              advice = extractedAdvice.replace(/\[\/?WRITTEN_BRIEFING\]/gi, '').trim();
 
               const cleanSpeech = speech
                 .replace(/[*#_~`>\[\]\(\)]/g, '')
@@ -865,6 +909,7 @@ let hudActionData: any = null;
                 success: true,
                 reply: advice,
                 speech: cleanSpeech,
+                heardText: heardText || (audioBase64 ? 'Studio voice command' : userPrompt),
                 deck: deckData,
                 videoAd: videoAdData,
                 pluginSpec: pluginSpecData,
@@ -978,6 +1023,7 @@ Ready to deploy whenever you are.`;
       success: true,
       reply: advice,
       speech: cleanSpeech,
+      heardText: audioBase64 ? 'Studio voice command' : userPrompt,
       hudAction: null,
       dispatch: dispatchLogged,
       source: 'jarvis-cognitive-engine',
