@@ -422,12 +422,14 @@ export async function createUser(data: {
     displayName: data.displayName?.trim() || normalizedEmail.split('@')[0],
     passwordHash,
     salt,
-    tier: 'All-Access Studio Pass',
+    tier: 'Standard Member',
     isLifetimeVIP: false,
-    subscriptionStatus: 'active',
-    ownedPlugins: ['ALL_15_PLUGINS'],
+    subscriptionStatus: 'none',
+    ownedPlugins: [],
     licenseKey: generateLicenseKey(),
-    authorizedMachines: ['PRIMARY-STUDIO-DEVICE'],
+    authorizedMachines: [],
+    machines: [],
+    maxDevices: 1,
     createdAt: now,
     lastLoginAt: now,
   };
@@ -716,10 +718,11 @@ export async function activateUserMachine(
   const hasAccess = user.isLifetimeVIP || user.subscriptionStatus === 'active';
   if (!hasAccess) {
     return {
-      success: false,
+      success: true,
       user: toSafeProfile(user),
       machineCount: 0,
-      maxDevices: user.maxDevices || 3,
+      maxDevices: user.maxDevices || 1,
+      licensePayload: null,
       error: 'No active All-Access Studio Pass found. Please subscribe or redeem a VIP code.',
     };
   }
