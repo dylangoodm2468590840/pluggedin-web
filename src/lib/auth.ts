@@ -836,7 +836,7 @@ export async function purgeTestOrders(): Promise<{ removedCount: number; remaini
 
 export interface JarvisDispatch {
   id: string;
-  type: 'bug' | 'optimization' | 'strategic_proposal' | 'security_alert';
+  type: 'bug' | 'optimization' | 'strategic_proposal' | 'security_alert' | 'marketing_dispatch';
   priority: 'critical' | 'high' | 'medium' | 'low';
   title: string;
   details: string;
@@ -1211,6 +1211,94 @@ export async function deleteJarvisDirective(id: string): Promise<void> {
     }
   }
 }
+
+// ==========================================
+// J.A.R.V.I.S. AI VIDEO MARKETING STAGING ENGINE
+// ==========================================
+
+export interface JarvisStagedVideo {
+  id: string;
+  template: 'ab_dry_wet' | 'workflow_hack' | 'producer_mythbusters';
+  title: string;
+  subtitle: string;
+  pluginId: string;
+  pluginName: string;
+  durationSec: number;
+  hookHeadline: string;
+  aspectRatio: '9:16';
+  audioPair: '808' | 'vocal' | 'sample';
+  audioDryUrl: string;
+  audioWetUrl: string;
+  scenes: Array<{
+    sceneNumber: number;
+    durationSec: number;
+    headline: string;
+    audioMode: 'dry' | 'tuned' | 'wet' | 'beat';
+    badgeText?: string;
+    subtitles: string[];
+    knobTarget?: number;
+    knobLabel?: string;
+  }>;
+  status: 'staged' | 'approved' | 'dispatched';
+  estimatedHookRetentionPct: number;
+  createdAt: string;
+}
+
+export async function fetchJarvisStagedVideos(): Promise<JarvisStagedVideo[]> {
+  const redis = getRedis();
+  if (redis) {
+    try {
+      const data = await redis.get('pluggedin_jarvis_staged_videos');
+      if (Array.isArray(data)) return data;
+      if (typeof data === 'string') {
+        try {
+          return JSON.parse(data);
+        } catch {}
+      }
+    } catch (e) {
+      console.warn('Error fetching staged videos from Upstash:', e);
+    }
+  }
+  return [];
+}
+
+export async function recordJarvisStagedVideo(video: JarvisStagedVideo): Promise<void> {
+  const redis = getRedis();
+  const videos = await fetchJarvisStagedVideos();
+  const idx = videos.findIndex((v) => v.id === video.id);
+  if (idx >= 0) {
+    videos[idx] = video;
+  } else {
+    videos.unshift(video);
+  }
+  if (redis) {
+    try {
+      await redis.set('pluggedin_jarvis_staged_videos', videos.slice(0, 30));
+    } catch (e) {
+      console.warn('Error saving staged video to Upstash:', e);
+    }
+  }
+}
+
+export async function updateJarvisStagedVideoStatus(
+  id: string,
+  status: 'staged' | 'approved' | 'dispatched'
+): Promise<void> {
+  const redis = getRedis();
+  const videos = await fetchJarvisStagedVideos();
+  const idx = videos.findIndex((v) => v.id === id);
+  if (idx >= 0) {
+    videos[idx].status = status;
+    if (redis) {
+      try {
+        await redis.set('pluggedin_jarvis_staged_videos', videos);
+      } catch (e) {
+        console.warn('Error updating staged video status in Upstash:', e);
+      }
+    }
+  }
+}
+
 
 
 
