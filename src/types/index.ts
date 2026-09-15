@@ -16,6 +16,11 @@ export interface PluginData {
   imageUrl?: string;
   downloadWinUrl?: string;
   downloadMacUrl?: string;
+  badgeText?: string;
+  badgeColor?: 'cyan' | 'purple' | 'amber' | 'emerald' | 'rose';
+  sortOrder?: number;
+  isOnSale?: boolean;
+  isVisible?: boolean;
 }
 
 export interface DemoTrack {

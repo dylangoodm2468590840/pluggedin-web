@@ -105,11 +105,27 @@ export const PluginCard: React.FC<PluginCardProps> = ({ plugin }) => {
             <h3 className="text-xl font-black text-white tracking-wide">
               {plugin.name}
             </h3>
-            {plugin.featured && (
+            {plugin.badgeText ? (
+              <span
+                className={`text-[10px] font-extrabold uppercase px-2 py-0.5 rounded border shadow-sm ${
+                  plugin.badgeColor === 'amber'
+                    ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'
+                    : plugin.badgeColor === 'cyan'
+                    ? 'bg-cyan-500/20 text-cyan-300 border-cyan-500/40'
+                    : plugin.badgeColor === 'rose'
+                    ? 'bg-rose-500/20 text-rose-300 border-rose-500/40'
+                    : plugin.badgeColor === 'emerald'
+                    ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
+                    : 'bg-purple-500/20 text-purple-300 border-purple-500/40'
+                }`}
+              >
+                {plugin.badgeText}
+              </span>
+            ) : plugin.featured ? (
               <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded bg-cyber-purple/20 text-cyber-purple border border-cyber-purple/30">
                 Flagship
               </span>
-            )}
+            ) : null}
           </div>
           <p className="text-xs text-slate-400 mt-1 line-clamp-2">
             {plugin.subtitle}
@@ -132,14 +148,18 @@ export const PluginCard: React.FC<PluginCardProps> = ({ plugin }) => {
         <div className="flex items-baseline justify-between">
           <div className="flex items-baseline space-x-2">
             <span className="text-2xl font-black text-white font-mono">
-              ${plugin.salePrice}
+              ${plugin.isOnSale !== false ? plugin.salePrice : plugin.retailPrice}
             </span>
-            <span className="text-xs text-slate-500 line-through font-mono">
-              ${plugin.retailPrice}
-            </span>
-            <span className="text-[10px] uppercase font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
-              Launch -{Math.round(((plugin.retailPrice - plugin.salePrice) / plugin.retailPrice) * 100)}%
-            </span>
+            {plugin.isOnSale !== false && plugin.retailPrice > plugin.salePrice && (
+              <>
+                <span className="text-xs text-slate-500 line-through font-mono">
+                  ${plugin.retailPrice}
+                </span>
+                <span className="text-[10px] uppercase font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
+                  Save {Math.round(((plugin.retailPrice - plugin.salePrice) / plugin.retailPrice) * 100)}%
+                </span>
+              </>
+            )}
           </div>
           <span className="text-[11px] text-slate-400 font-medium">Perpetual Lifetime</span>
         </div>

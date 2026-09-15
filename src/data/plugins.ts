@@ -404,3 +404,39 @@ export const ALL_ACCESS_ANNUAL = 99;
 export const FOUNDERS_PROMO_MONTHLY = 14.99;
 export const FOUNDERS_SPOTS_TOTAL = 250;
 export const FOUNDERS_SPOTS_REMAINING = 47;
+
+export function applySiteConfigOverrides(
+  basePlugins: PluginData[],
+  siteConfig?: any | null
+): PluginData[] {
+  if (!siteConfig || !siteConfig.catalogOverrides) {
+    return basePlugins;
+  }
+
+  const overrides = siteConfig.catalogOverrides;
+
+  const merged = basePlugins.map((plugin, index) => {
+    const override =
+      overrides[plugin.id] ||
+      overrides[plugin.id.toLowerCase()] ||
+      overrides[plugin.shortName.toLowerCase()];
+
+    if (!override) return plugin;
+
+    return {
+      ...plugin,
+      retailPrice: override.retailPrice !== undefined ? override.retailPrice : plugin.retailPrice,
+      salePrice: override.salePrice !== undefined ? override.salePrice : plugin.salePrice,
+      isOnSale: override.isOnSale !== undefined ? override.isOnSale : true,
+      featured: override.featured !== undefined ? override.featured : plugin.featured,
+      badgeText: override.badgeText !== undefined ? override.badgeText : plugin.badgeText,
+      badgeColor: override.badgeColor !== undefined ? override.badgeColor : plugin.badgeColor,
+      sortOrder: override.sortOrder !== undefined ? override.sortOrder : index,
+      isVisible: override.isVisible !== undefined ? override.isVisible : true,
+    };
+  });
+
+  return merged
+    .filter((p) => p.isVisible !== false)
+    .sort((a, b) => (a.sortOrder ?? 99) - (b.sortOrder ?? 99));
+}

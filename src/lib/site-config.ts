@@ -1,3 +1,21 @@
+export interface PluginCatalogOverride {
+  retailPrice?: number;
+  salePrice?: number;
+  isOnSale?: boolean;
+  featured?: boolean;
+  badgeText?: string;
+  badgeColor?: 'cyan' | 'purple' | 'amber' | 'emerald' | 'rose';
+  sortOrder?: number;
+  isVisible?: boolean;
+}
+
+export interface SubscriptionPricingConfig {
+  monthlyPrice: number;
+  annualPrice: number;
+  foundingSpotsTotal: number;
+  foundingSpotsLeft: number;
+}
+
 export interface SiteConfig {
   version: number;
   updatedAt: string;
@@ -27,6 +45,8 @@ export interface SiteConfig {
     code: string;
     discountPercent: number;
   };
+  catalogOverrides?: Record<string, PluginCatalogOverride>;
+  subscriptionPricing?: SubscriptionPricingConfig;
 }
 
 export const DEFAULT_SITE_CONFIG: SiteConfig = {
@@ -57,6 +77,13 @@ export const DEFAULT_SITE_CONFIG: SiteConfig = {
     headline: "Pre-Launch Founder Early Access Live",
     code: "FOUNDERVIP",
     discountPercent: 20,
+  },
+  catalogOverrides: {},
+  subscriptionPricing: {
+    monthlyPrice: 14.99,
+    annualPrice: 99.00,
+    foundingSpotsTotal: 100,
+    foundingSpotsLeft: 12,
   },
 };
 
@@ -116,6 +143,32 @@ export function validateSiteConfigUpdate(partial: any): { valid: boolean; error?
     }
   }
 
+  if (partial.catalogOverrides && typeof partial.catalogOverrides === 'object') {
+    for (const [pId, override] of Object.entries(partial.catalogOverrides)) {
+      if (typeof override !== 'object' || !override) continue;
+      const o = override as any;
+      if (o.retailPrice !== undefined && (typeof o.retailPrice !== 'number' || o.retailPrice < 0 || o.retailPrice > 9999)) {
+        return { valid: false, error: `Invalid retail price for plugin ${pId}` };
+      }
+      if (o.salePrice !== undefined && (typeof o.salePrice !== 'number' || o.salePrice < 0 || o.salePrice > 9999)) {
+        return { valid: false, error: `Invalid sale price for plugin ${pId}` };
+      }
+      if (o.badgeText !== undefined && (typeof o.badgeText !== 'string' || o.badgeText.length > 30)) {
+        return { valid: false, error: `Badge text for plugin ${pId} exceeds 30 characters` };
+      }
+    }
+  }
+
+  if (partial.subscriptionPricing && typeof partial.subscriptionPricing === 'object') {
+    const sp = partial.subscriptionPricing as any;
+    if (sp.monthlyPrice !== undefined && (typeof sp.monthlyPrice !== 'number' || sp.monthlyPrice < 0)) {
+      return { valid: false, error: 'Invalid monthly subscription price' };
+    }
+    if (sp.annualPrice !== undefined && (typeof sp.annualPrice !== 'number' || sp.annualPrice < 0)) {
+      return { valid: false, error: 'Invalid annual subscription price' };
+    }
+  }
+
   return { valid: true };
 }
 
@@ -145,6 +198,8 @@ export async function fetchSiteConfig(): Promise<SiteConfig> {
           banner: { ...DEFAULT_SITE_CONFIG.banner, ...(parsed.banner || {}) },
           hero: { ...DEFAULT_SITE_CONFIG.hero, ...(parsed.hero || {}) },
           promoNotice: { ...DEFAULT_SITE_CONFIG.promoNotice, ...(parsed.promoNotice || {}) },
+          catalogOverrides: { ...(DEFAULT_SITE_CONFIG.catalogOverrides || {}), ...(parsed.catalogOverrides || {}) },
+          subscriptionPricing: { ...DEFAULT_SITE_CONFIG.subscriptionPricing, ...(parsed.subscriptionPricing || {}) },
         };
       }
     } catch (e) {
@@ -183,6 +238,16 @@ export async function saveSiteConfig(
     promoNotice: {
       ...current.promoNotice,
       ...(partial.promoNotice || {}),
+    },
+    catalogOverrides: {
+      ...(current.catalogOverrides || {}),
+      ...(partial.catalogOverrides || {}),
+    },
+    subscriptionPricing: {
+      monthlyPrice: partial.subscriptionPricing?.monthlyPrice ?? current.subscriptionPricing?.monthlyPrice ?? DEFAULT_SITE_CONFIG.subscriptionPricing?.monthlyPrice ?? 14.99,
+      annualPrice: partial.subscriptionPricing?.annualPrice ?? current.subscriptionPricing?.annualPrice ?? DEFAULT_SITE_CONFIG.subscriptionPricing?.annualPrice ?? 99.00,
+      foundingSpotsTotal: partial.subscriptionPricing?.foundingSpotsTotal ?? current.subscriptionPricing?.foundingSpotsTotal ?? DEFAULT_SITE_CONFIG.subscriptionPricing?.foundingSpotsTotal ?? 100,
+      foundingSpotsLeft: partial.subscriptionPricing?.foundingSpotsLeft ?? current.subscriptionPricing?.foundingSpotsLeft ?? DEFAULT_SITE_CONFIG.subscriptionPricing?.foundingSpotsLeft ?? 12,
     },
   };
 

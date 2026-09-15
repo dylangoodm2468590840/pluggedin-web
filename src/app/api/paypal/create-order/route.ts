@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createPayPalOrder } from '../../../../lib/paypal';
-import { ALL_ACCESS_MONTHLY, ALL_ACCESS_ANNUAL, PLUGINS_DATA } from '../../../../data/plugins';
+import { ALL_ACCESS_MONTHLY, ALL_ACCESS_ANNUAL, PLUGINS_DATA, applySiteConfigOverrides } from '../../../../data/plugins';
+import { fetchSiteConfig } from '../../../../lib/site-config';
 import { verifySessionToken } from '../../../../lib/auth';
 
 export async function POST(req: NextRequest) {
@@ -8,21 +9,27 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const { plan, pluginId, promoCode } = body;
 
+    const siteConfig = await fetchSiteConfig();
+    const dynamicPlugins = applySiteConfigOverrides(PLUGINS_DATA, siteConfig);
+
     let amount = 0;
     let description = '';
 
     if (plan === 'annual') {
-      amount = ALL_ACCESS_ANNUAL; // 99
+      amount = siteConfig.subscriptionPricing?.annualPrice ?? ALL_ACCESS_ANNUAL;
       description = 'PluggedIN All-Access Studio Pass (Annual)';
     } else if (plan === 'monthly') {
-      amount = ALL_ACCESS_MONTHLY; // 14.99
+      amount = siteConfig.subscriptionPricing?.monthlyPrice ?? ALL_ACCESS_MONTHLY;
       description = 'PluggedIN All-Access Studio Pass (Monthly)';
     } else if (pluginId) {
-      const plugin = PLUGINS_DATA.find((p) => p.id === pluginId);
+      const cleanId = pluginId.trim().toLowerCase();
+      const plugin = dynamicPlugins.find(
+        (p) => p.id.toLowerCase() === cleanId || p.shortName.toLowerCase() === cleanId
+      );
       if (!plugin) {
         return NextResponse.json({ success: false, error: 'Plugin not found' }, { status: 404 });
       }
-      amount = plugin.salePrice;
+      amount = plugin.isOnSale !== false ? plugin.salePrice : plugin.retailPrice;
       description = `PluggedIN Perpetual License - ${plugin.name}`;
     } else {
       return NextResponse.json({ success: false, error: 'Invalid checkout item' }, { status: 400 });

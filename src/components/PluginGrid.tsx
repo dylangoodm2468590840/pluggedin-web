@@ -1,9 +1,9 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import Link from 'next/link';
 import { Search, SlidersHorizontal, Sparkles, Music, Mic, Radio, Waves, Cpu, Disc3, ArrowRight } from 'lucide-react';
-import { PLUGINS_DATA } from '../data/plugins';
+import { PLUGINS_DATA, applySiteConfigOverrides } from '../data/plugins';
 import { PluginCard } from './PluginCard';
 
 interface CategoryFilter {
@@ -54,11 +54,25 @@ const CATEGORY_FILTERS: CategoryFilter[] = [
 export const PluginGrid: React.FC = () => {
   const [selectedCategoryId, setSelectedCategoryId] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const [siteConfig, setSiteConfig] = useState<any | null>(null);
+
+  useEffect(() => {
+    fetch('/api/site-config')
+      .then((r) => r.json())
+      .then((cfg) => {
+        if (cfg) setSiteConfig(cfg);
+      })
+      .catch(() => {});
+  }, []);
+
+  const dynamicPlugins = useMemo(() => {
+    return applySiteConfigOverrides(PLUGINS_DATA, siteConfig);
+  }, [siteConfig]);
 
   const currentFilter = CATEGORY_FILTERS.find((f) => f.id === selectedCategoryId) || CATEGORY_FILTERS[0];
 
   const filteredPlugins = useMemo(() => {
-    return PLUGINS_DATA.filter((plugin) => {
+    return dynamicPlugins.filter((plugin) => {
       const matchesCat = currentFilter.matches(plugin.category, plugin.id);
       const matchesSearch =
         plugin.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -67,16 +81,16 @@ export const PluginGrid: React.FC = () => {
         plugin.category.toLowerCase().includes(searchQuery.toLowerCase());
       return matchesCat && matchesSearch;
     });
-  }, [currentFilter, searchQuery]);
+  }, [dynamicPlugins, currentFilter, searchQuery]);
 
   // Compute counts for each category badge
   const categoryCounts = useMemo(() => {
     const counts: Record<string, number> = {};
     CATEGORY_FILTERS.forEach((filter) => {
-      counts[filter.id] = PLUGINS_DATA.filter((p) => filter.matches(p.category, p.id)).length;
+      counts[filter.id] = dynamicPlugins.filter((p) => filter.matches(p.category, p.id)).length;
     });
     return counts;
-  }, []);
+  }, [dynamicPlugins]);
 
   return (
     <section id="plugins" className="py-24 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
