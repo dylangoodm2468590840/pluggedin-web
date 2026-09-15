@@ -203,16 +203,26 @@ export async function GET(req: NextRequest) {
     const conversionRate = effectiveVisitors > 0 ? ((completedCount / effectiveVisitors) * 100) : 0;
     const rpv = effectiveVisitors > 0 ? grossTotal / effectiveVisitors : 0;
 
-    // 5. Plugin Leaderboard Ranking
+    // 5. Plugin Leaderboard Ranking with Status & Conversion
     const leaderboard = ALL_15_PLUGINS.map((p) => {
       const stats = pluginSalesMap[p.id] || { units: 0, gross: 0, net: 0 };
       const contrib = grossTotal > 0 ? (stats.gross / grossTotal) * 100 : 0;
+      const conv = effectiveVisitors > 0 ? ((stats.units / Math.max(1, effectiveVisitors / 15)) * 100) : 0;
+      let status: 'BESTSELLER' | 'RISING' | 'SLEEPER' = 'SLEEPER';
+      if (stats.units >= 5 || stats.gross >= 200) {
+        status = 'BESTSELLER';
+      } else if (stats.units >= 1) {
+        status = 'RISING';
+      }
+
       return {
         ...p,
         unitsSold: stats.units,
         grossRevenue: Number(stats.gross.toFixed(2)),
         netRevenue: Number(stats.net.toFixed(2)),
         contributionPct: Number(contrib.toFixed(1)),
+        conversionRatePct: Number(conv.toFixed(2)),
+        status,
       };
     }).sort((a, b) => b.grossRevenue - a.grossRevenue || b.unitsSold - a.unitsSold);
 
