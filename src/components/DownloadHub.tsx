@@ -80,39 +80,37 @@ export const DownloadHub: React.FC = () => {
               </p>
             </div>
 
-            {/* Primary OS Download CTA */}
-            <a
-              href={os === 'mac' ? macDownloadUrl : winDownloadUrl}
-              className="w-full py-4 rounded-xl bg-gradient-to-r from-cyber-cyan to-blue-600 text-black text-xs font-black shadow-glow-cyan hover:brightness-110 active:scale-95 transition-all flex items-center justify-center space-x-2"
-            >
-              <Download className="w-4 h-4" />
-              <span>
-                Download for {os === 'mac' ? 'macOS (DMG)' : 'Windows (EXE)'}
-              </span>
-            </a>
+            {/* Dual OS Download CTAs */}
+            <div className="w-full space-y-3">
+              <a
+                href={winDownloadUrl}
+                className="w-full py-3.5 px-4 rounded-xl bg-gradient-to-r from-cyber-cyan to-blue-600 text-black text-xs font-black shadow-glow-cyan hover:brightness-110 active:scale-95 transition-all flex items-center justify-between"
+              >
+                <div className="flex items-center space-x-2.5">
+                  <Laptop className="w-4 h-4 text-black" />
+                  <span>Download for Windows</span>
+                </div>
+                <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-black/20 text-black font-bold">
+                  .EXE (64-bit)
+                </span>
+              </a>
 
-            {/* Alternate OS link */}
-            <div className="text-[11px] text-slate-400 flex items-center space-x-2">
-              <span>Also available for:</span>
-              {os === 'mac' ? (
-                <a
-                  href={winDownloadUrl}
-                  className="text-cyber-cyan font-bold hover:underline"
-                >
-                  Windows (EXE)
-                </a>
-              ) : (
-                <a
-                  href={macDownloadUrl}
-                  className="text-cyber-cyan font-bold hover:underline"
-                >
-                  macOS (DMG)
-                </a>
-              )}
+              <a
+                href={macDownloadUrl}
+                className="w-full py-3.5 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 border border-white/10 text-white text-xs font-bold active:scale-95 transition-all flex items-center justify-between"
+              >
+                <div className="flex items-center space-x-2.5">
+                  <Apple className="w-4 h-4 text-white" />
+                  <span>Download for macOS</span>
+                </div>
+                <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-white/10 text-slate-300 font-bold">
+                  .DMG (Universal)
+                </span>
+              </a>
             </div>
 
-            <div className="text-[10px] text-slate-500 font-mono">
-              100% Free Download • No Account Required to Install
+            <div className="text-[10px] text-slate-400 font-mono">
+              Free Download • Sign in with your pluggedin.studio account to activate plugins
             </div>
           </div>
         </div>

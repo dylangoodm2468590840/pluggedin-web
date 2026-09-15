@@ -3,6 +3,8 @@ import {
   verifySessionToken,
   resetAllUserMachines,
   revokeUserAccess,
+  grantVipToUser,
+  revokeVipFromUser,
   saveOrderRecord,
   purgeTestOrders,
   recordJarvisDispatch,
@@ -75,6 +77,32 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({
         success: true,
         message: `Access revoked for ${updated.displayName || updated.email}`,
+        user: updated,
+      });
+    }
+
+    if (action === 'grant_vip') {
+      const target = userId || body.email;
+      if (!target) {
+        return NextResponse.json({ success: false, error: 'User ID or email required' }, { status: 400 });
+      }
+      const updated = await grantVipToUser(target);
+      return NextResponse.json({
+        success: true,
+        message: `Lifetime VIP granted to ${updated.displayName || updated.email}`,
+        user: updated,
+      });
+    }
+
+    if (action === 'revoke_vip') {
+      const target = userId || body.email;
+      if (!target) {
+        return NextResponse.json({ success: false, error: 'User ID or email required' }, { status: 400 });
+      }
+      const updated = await revokeVipFromUser(target);
+      return NextResponse.json({
+        success: true,
+        message: `VIP revoked for ${updated.displayName || updated.email}`,
         user: updated,
       });
     }

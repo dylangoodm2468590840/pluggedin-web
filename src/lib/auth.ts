@@ -440,6 +440,88 @@ export async function createUser(data: {
   return { user: toSafeProfile(newUser), token };
 }
 
+export async function createVipUser(data: {
+  email: string;
+  password: string;
+  displayName?: string;
+  vipSource?: string;
+}): Promise<{ user: UserSafeProfile; token: string }> {
+  const normalizedEmail = data.email.trim().toLowerCase();
+  const cloudUsers = await fetchCloudUsers();
+  const users = cloudUsers || readUsers();
+
+  if (users.some((u) => u.email.toLowerCase() === normalizedEmail)) {
+    throw new Error('An account with this email already exists. Please sign in to Plugged In Central.');
+  }
+
+  const salt = crypto.randomBytes(16).toString('hex');
+  const passwordHash = hashPassword(data.password, salt);
+  const now = new Date().toISOString();
+
+  const newUser: UserRecord = {
+    id: 'usr_' + crypto.randomBytes(6).toString('hex'),
+    email: normalizedEmail,
+    displayName: data.displayName?.trim() || normalizedEmail.split('@')[0],
+    passwordHash,
+    salt,
+    tier: 'All-Access Studio Pass',
+    isLifetimeVIP: true,
+    subscriptionStatus: 'active',
+    ownedPlugins: ['ALL_15_PLUGINS'],
+    licenseKey: generateLicenseKey(),
+    authorizedMachines: [],
+    machines: [],
+    maxDevices: 5,
+    createdAt: now,
+    lastLoginAt: now,
+  };
+
+  users.push(newUser);
+  writeUsers(users);
+  await saveCloudUsers(users);
+
+  const token = createSessionToken(newUser.id, newUser.email);
+  return { user: toSafeProfile(newUser), token };
+}
+
+export async function grantVipToUser(userIdOrEmail: string): Promise<UserSafeProfile> {
+  const cloudUsers = await fetchCloudUsers();
+  const users = cloudUsers || readUsers();
+  const cleanId = userIdOrEmail.trim().toLowerCase();
+  const user = users.find((u) => u.id === userIdOrEmail || u.email.toLowerCase() === cleanId);
+  if (!user) {
+    throw new Error('User not found');
+  }
+
+  user.isLifetimeVIP = true;
+  user.tier = 'All-Access Studio Pass';
+  user.subscriptionStatus = 'active';
+  user.maxDevices = 5;
+  user.ownedPlugins = ['ALL_15_PLUGINS'];
+
+  writeUsers(users);
+  await saveCloudUsers(users);
+  return toSafeProfile(user);
+}
+
+export async function revokeVipFromUser(userIdOrEmail: string): Promise<UserSafeProfile> {
+  const cloudUsers = await fetchCloudUsers();
+  const users = cloudUsers || readUsers();
+  const cleanId = userIdOrEmail.trim().toLowerCase();
+  const user = users.find((u) => u.id === userIdOrEmail || u.email.toLowerCase() === cleanId);
+  if (!user) {
+    throw new Error('User not found');
+  }
+
+  user.isLifetimeVIP = false;
+  user.tier = 'Standard Member';
+  user.subscriptionStatus = 'none';
+
+  writeUsers(users);
+  await saveCloudUsers(users);
+  return toSafeProfile(user);
+}
+
 export async function verifyUserLogin(
   email: string,
   pass: string
