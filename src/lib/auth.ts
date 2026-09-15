@@ -156,16 +156,8 @@ export function deduplicateUsers(users: UserRecord[]): UserRecord[] {
       continue; // Discard dylan@pluggedin.studio in favor of dylangoodm@gmail.com
     }
 
-    // Clean out temporary test accounts
-    if (
-      cleanEmail.includes('hitmakers.com') ||
-      cleanEmail.startsWith('test_') ||
-      cleanEmail === 'testfriend@pluggedin.studio' ||
-      cleanEmail.includes('buddy.verification.') ||
-      cleanEmail.includes('buddy.vip.') ||
-      cleanEmail.includes('buddy.free.') ||
-      cleanEmail === 'dylanfriendtest@example.com'
-    ) {
+    // Clean out old mock seed accounts
+    if (cleanEmail.includes('hitmakers.com')) {
       continue;
     }
 
